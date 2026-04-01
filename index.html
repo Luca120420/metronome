@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BeatSync — Video Metronome</title>
+<link rel="icon" href="logo.ico" type="image/x-icon">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Bebas+Neue&display=swap');
   :root {
@@ -96,7 +97,7 @@
   .bpm-row { display: flex; align-items: center; gap: 8px; margin-bottom: 0; flex: 1; }
   .bpm-arrow { background: transparent; border: 1px solid var(--border); color: var(--muted); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.75rem; transition: all 0.1s; border-radius: var(--radius); font-family: monospace; flex-shrink: 0; }
   .bpm-arrow:hover { border-color: var(--accent); color: var(--accent); }
-  #rampSection { display: none; }
+  #rampSection { display: none; } /* controlled via JS */
 
   /* RAMP VISUAL PREVIEW */
   .ramp-preview {
@@ -224,11 +225,13 @@
       <div class="section-body">
         <div class="dropzone" id="dropzone">
           <input type="file" accept="video/*" id="fileInput">
-          <div class="dropzone-icon">▶</div>
+          <label for="fileInput" style="position:absolute;inset:0;cursor:pointer;z-index:1;"></label>
+          <div class="dropzone-icon" style="cursor:pointer;">▶</div>
           <p><strong>Drop video here or click to browse</strong>MP4, MOV, AVI, MKV, WebM — any length</p>
         </div>
-        <div id="videoContainer" style="margin-top:16px;">
-          <video id="videoPlayer" controls></video>
+        <div id="videoContainer" style="margin-top:16px;display:none;">
+          <canvas id="firstFrame" style="width:100%;max-height:160px;object-fit:contain;border-radius:var(--radius);background:#000;display:block;"></canvas>
+          <video id="videoPlayer" style="display:none;"></video>
           <div class="video-info">
             <span>DURATION <strong id="vDuration">—</strong></span>
             <span>SIZE <strong id="vSize">—</strong></span>
@@ -271,36 +274,42 @@
         </div>
 
         <div id="rampSection">
-          <div class="control-row" style="margin-top:8px;">
-            <span class="control-label">Start BPM</span>
-            <div class="bpm-row">
-              <button class="bpm-arrow" onclick="changeBpm('start',-10)">−10</button>
-              <button class="bpm-arrow" onclick="changeBpm('start',-1)">−</button>
-              <input type="number" class="num-input" id="bpmStart" value="60" min="20" max="300" oninput="updateRampPreview();updateSummary()">
-              <button class="bpm-arrow" onclick="changeBpm('start',+1)">+</button>
-              <button class="bpm-arrow" onclick="changeBpm('start',+10)">+10</button>
+          <div style="margin-top:8px; display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <div style="font-size:0.65rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Start BPM</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div class="bpm-row">
+                  <button class="bpm-arrow" onclick="changeBpm('start',-10)">−10</button>
+                  <button class="bpm-arrow" onclick="changeBpm('start',-1)">−</button>
+                  <input type="number" class="num-input" id="bpmStart" value="60" min="20" max="300" oninput="updateRampPreview();updateSummary()">
+                  <button class="bpm-arrow" onclick="changeBpm('start',+1)">+</button>
+                  <button class="bpm-arrow" onclick="changeBpm('start',+10)">+10</button>
+                </div>
+                <span class="num-input-unit">BPM</span>
+                <button class="test-btn" id="testStart" onclick="toggleTest('start')"></button>
+                  <span class="dot"></span>TEST
+                </button>
+                <div class="beat-indicator" id="beatStart"></div>
+              </div>
             </div>
-            <span class="num-input-unit">BPM</span>
-            <button class="test-btn" id="testStart" onclick="toggleTest('start')">
-              <span class="dot"></span>TEST
-            </button>
-            <div class="beat-indicator" id="beatStart"></div>
-          </div>
 
-          <div class="control-row" style="margin-top:12px;">
-            <span class="control-label">End BPM</span>
-            <div class="bpm-row">
-              <button class="bpm-arrow" onclick="changeBpm('end',-10)">−10</button>
-              <button class="bpm-arrow" onclick="changeBpm('end',-1)">−</button>
-              <input type="number" class="num-input" id="bpmEnd" value="120" min="20" max="300" oninput="updateRampPreview();updateSummary()">
-              <button class="bpm-arrow" onclick="changeBpm('end',+1)">+</button>
-              <button class="bpm-arrow" onclick="changeBpm('end',+10)">+10</button>
+            <div>
+              <div style="font-size:0.65rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">End BPM</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div class="bpm-row">
+                  <button class="bpm-arrow" onclick="changeBpm('end',-10)">−10</button>
+                  <button class="bpm-arrow" onclick="changeBpm('end',-1)">−</button>
+                  <input type="number" class="num-input" id="bpmEnd" value="120" min="20" max="300" oninput="updateRampPreview();updateSummary()">
+                  <button class="bpm-arrow" onclick="changeBpm('end',+1)">+</button>
+                  <button class="bpm-arrow" onclick="changeBpm('end',+10)">+10</button>
+                </div>
+                <span class="num-input-unit">BPM</span>
+                <button class="test-btn" id="testEnd" onclick="toggleTest('end')">
+                  <span class="dot"></span>TEST
+                </button>
+                <div class="beat-indicator" id="beatEnd"></div>
+              </div>
             </div>
-            <span class="num-input-unit">BPM</span>
-            <button class="test-btn" id="testEnd" onclick="toggleTest('end')">
-              <span class="dot"></span>TEST
-            </button>
-            <div class="beat-indicator" id="beatEnd"></div>
           </div>
 
           <!-- RAMP PREVIEW -->
@@ -439,8 +448,8 @@ function setMode(m) {
   state.mode = m;
   document.getElementById('modeFixed').classList.toggle('active', m === 'fixed');
   document.getElementById('modeRamp').classList.toggle('active', m === 'ramp');
-  document.getElementById('fixedSection').style.display = m === 'fixed' ? '' : 'none';
-  document.getElementById('rampSection').style.display = m === 'ramp' ? '' : 'none';
+  document.getElementById('fixedSection').style.display = m === 'fixed' ? 'block' : 'none';
+  document.getElementById('rampSection').style.display = m === 'ramp' ? 'block' : 'none';
   if (m === 'ramp') updateRampPreview();
   updateSummary();
 }
@@ -688,9 +697,18 @@ function loadVideo(file) {
     document.getElementById('vDuration').textContent = formatTime(player.duration);
     if (state.mode === 'ramp') updateRampPreview();
   };
+  player.onseeked = () => {
+    const canvas = document.getElementById('firstFrame');
+    const maxW = 480, maxH = 160;
+    const ratio = Math.min(maxW / player.videoWidth, maxH / player.videoHeight);
+    canvas.width = Math.round(player.videoWidth * ratio);
+    canvas.height = Math.round(player.videoHeight * ratio);
+    canvas.getContext('2d').drawImage(player, 0, 0, canvas.width, canvas.height);
+  };
+  player.onloadeddata = () => { player.currentTime = 0.001; };
   document.getElementById('vSize').textContent = formatBytes(file.size);
   document.getElementById('vType').textContent = file.type.split('/')[1].toUpperCase();
-  document.getElementById('videoContainer').style.display = '';
+  document.getElementById('videoContainer').style.display = 'block';
   document.getElementById('processBtn').disabled = false;
   setStatus('Video loaded — configure settings and process', '');
   updateSummary();
@@ -705,7 +723,7 @@ async function startProcessing() {
   Object.keys(testTimers).forEach(k => stopTest(k));
   const btn = document.getElementById('processBtn');
   btn.disabled = true;
-  document.getElementById('renderSection').style.display = '';
+  document.getElementById('renderSection').style.display = 'block';
   document.getElementById('downloadBtn').style.display = 'none';
   STEPS.forEach(id => document.getElementById(id).className = 'step-pill');
 
@@ -738,7 +756,7 @@ async function startProcessing() {
     setStatus('Processing complete!', 'ok');
     const dlBtn = document.getElementById('downloadBtn');
     dlBtn.href = result;
-    dlBtn.style.display = '';
+    dlBtn.style.display = 'block';
     dlBtn.download = 'beatsync_' + (state.videoFile?.name?.replace(/\.[^.]+$/, '') || 'output') + '.webm';
 
   } catch(err) {
