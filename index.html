@@ -5,6 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BeatSync — Video Metronome</title>
 <link rel="icon" href="logo.ico" type="image/x-icon">
+
+<!--
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  COOP / COEP SERVICE WORKER — registers before anything else runs.      │
+  │  GitHub Pages does not send cross-origin isolation headers, so           │
+  │  SharedArrayBuffer is blocked.  The SW injects them on every response,  │
+  │  making the page cross-origin-isolated and unlocking SharedArrayBuffer.  │
+  │                                                                          │
+  │  On the very first load the SW isn't controlling the page yet, so we    │
+  │  reload once automatically (guarded by sessionStorage).                  │
+  └─────────────────────────────────────────────────────────────────────────┘
+-->
+<script>
+(function () {
+  if (!('serviceWorker' in navigator)) return; // Safari < 11.1, old Edge — skip
+
+  navigator.serviceWorker.register('./coop-sw.js', { scope: './' })
+    .then(reg => {
+      // If a new SW just installed and took control, reload so it can inject
+      // the COOP/COEP headers on this very document.
+      if (reg.active && !navigator.serviceWorker.controller) {
+        // SW active but not yet controlling — one-time reload
+        if (!sessionStorage.getItem('_sw_reloaded')) {
+          sessionStorage.setItem('_sw_reloaded', '1');
+          location.reload();
+        }
+      }
+    })
+    .catch(err => console.warn('SW registration failed:', err));
+
+  // If the SW takes control mid-session, reload so headers apply.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!sessionStorage.getItem('_sw_reloaded')) {
+      sessionStorage.setItem('_sw_reloaded', '1');
+      location.reload();
+    }
+  });
+})();
+</script>
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Bebas+Neue&display=swap');
   :root {
@@ -89,22 +129,11 @@
   .slider-val { font-size: 0.75rem; color: var(--text); min-width: 36px; text-align: right; }
 
   .test-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+    background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap; flex-shrink: 0;
   }
   .test-btn:hover { border-color: var(--accent2); color: var(--accent2); }
   .test-btn.playing { border-color: var(--danger); color: var(--danger); background: rgba(255,51,102,0.05); }
@@ -119,57 +148,17 @@
   .bpm-arrow:hover { border-color: var(--accent); color: var(--accent); }
   #rampSection { display: none; }
 
-  .bpm-blocks-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 12px;
-  }
-  .bpm-block {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 12px;
-  }
-  .bpm-block-label {
-    font-size: 0.58rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 10px;
-  }
+  .bpm-blocks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .bpm-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 12px; }
+  .bpm-block-label { font-size: 0.58rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
   .bpm-block .bpm-row { flex-wrap: wrap; gap: 3px; }
   .bpm-block .num-input { width: 82px; font-size: 1rem; }
-  .bpm-block-footer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-  }
+  .bpm-block-footer { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 
-  .ramp-preview {
-    margin-top: 16px;
-    padding: 14px 16px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    border-left: 2px solid var(--accent);
-  }
-  .ramp-preview-label {
-    font-size: 0.6rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 10px;
-  }
+  .ramp-preview { margin-top: 16px; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent); }
+  .ramp-preview-label { font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
   .ramp-svg-wrap { width: 100%; height: 48px; }
-  .ramp-info {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
-    font-size: 0.65rem;
-    color: var(--muted);
-  }
+  .ramp-info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.65rem; color: var(--muted); }
   .ramp-info span strong { color: var(--accent); font-size: 0.8rem; }
 
   .beat-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.05s; flex-shrink: 0; }
@@ -177,76 +166,24 @@
 
   .render-section { display: none; }
 
-  .steps-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 14px;
-  }
-  .step-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-  }
-  .step-pill-bar {
-    width: 100%;
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    transition: background 0.3s;
-  }
-  .step-label-txt {
-    font-size: 0.48rem;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    color: var(--muted);
-    transition: color 0.3s;
-  }
+  .steps-row { display: flex; gap: 6px; margin-bottom: 14px; }
+  .step-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .step-pill-bar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; transition: background 0.3s; }
+  .step-label-txt { font-size: 0.48rem; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); transition: color 0.3s; }
   .step-item.done .step-pill-bar { background: var(--accent); }
   .step-item.active .step-pill-bar { background: var(--accent2); animation: breathe 0.8s ease infinite; }
   .step-item.done .step-label-txt { color: var(--accent); }
   .step-item.active .step-label-txt { color: var(--accent2); }
   @keyframes breathe { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
-  .progress-track {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    height: 8px;
-    overflow: hidden;
-    margin: 8px 0 4px;
-    position: relative;
-  }
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent) 0%, #d9ff1a 100%);
-    width: 0%;
-    transition: width 0.25s ease;
-    box-shadow: 0 0 10px rgba(200,255,0,0.4);
-    border-radius: var(--radius);
-  }
-  .progress-fill.indeterminate {
-    width: 40% !important;
-    animation: slide 1.2s ease-in-out infinite;
-  }
-  @keyframes slide {
-    0% { transform: translateX(-150%); }
-    100% { transform: translateX(350%); }
-  }
-  .progress-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+  .progress-track { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); height: 8px; overflow: hidden; margin: 8px 0 4px; position: relative; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #d9ff1a 100%); width: 0%; transition: width 0.25s ease; box-shadow: 0 0 10px rgba(200,255,0,0.4); border-radius: var(--radius); }
+  .progress-fill.indeterminate { width: 40% !important; animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-150%); } 100% { transform: translateX(350%); } }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; }
   .progress-step { font-size: 0.65rem; color: var(--text); letter-spacing: 1px; }
   .progress-pct { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); letter-spacing: 2px; }
-  .progress-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 4px;
-  }
+  .progress-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
   .progress-sub { font-size: 0.6rem; color: var(--muted); letter-spacing: 1px; }
   .elapsed-timer { font-size: 0.58rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -263,20 +200,9 @@
   .status.error { color: var(--danger); }
   .status.ok { color: var(--accent); }
   .divider { height: 1px; background: var(--border); margin: 4px 0; }
-  .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.7rem; color: var(--muted); user-select: none; }
-  .checkbox-label input { display: none; }
-  .checkbox-label .box { width: 14px; height: 14px; border: 1px solid var(--border); border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; transition: all 0.15s; flex-shrink: 0; }
-  .checkbox-label input:checked + .box { background: var(--accent); border-color: var(--accent); color: #000; }
   .note { font-size: 0.6rem; color: var(--muted); line-height: 1.6; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent2); }
 
-  .right-panel-header {
-    margin: -28px -28px 0;
-    padding: 16px 28px;
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-  }
+  .right-panel-header { margin: -28px -28px 0; padding: 16px 28px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; align-items: center; }
 
   @media (max-width: 900px) {
     .main { grid-template-columns: 1fr; }
@@ -473,26 +399,11 @@
     <!-- PROGRESS -->
     <div class="render-section" id="renderSection">
       <div class="steps-row">
-        <div class="step-item" id="step1">
-          <div class="step-pill-bar"></div>
-          <div class="step-label-txt">Read</div>
-        </div>
-        <div class="step-item" id="step2">
-          <div class="step-pill-bar"></div>
-          <div class="step-label-txt">Decode</div>
-        </div>
-        <div class="step-item" id="step3">
-          <div class="step-pill-bar"></div>
-          <div class="step-label-txt">Synth</div>
-        </div>
-        <div class="step-item" id="step4">
-          <div class="step-pill-bar"></div>
-          <div class="step-label-txt">Mix</div>
-        </div>
-        <div class="step-item" id="step5">
-          <div class="step-pill-bar"></div>
-          <div class="step-label-txt">Export</div>
-        </div>
+        <div class="step-item" id="step1"><div class="step-pill-bar"></div><div class="step-label-txt">Read</div></div>
+        <div class="step-item" id="step2"><div class="step-pill-bar"></div><div class="step-label-txt">Decode</div></div>
+        <div class="step-item" id="step3"><div class="step-pill-bar"></div><div class="step-label-txt">Synth</div></div>
+        <div class="step-item" id="step4"><div class="step-pill-bar"></div><div class="step-label-txt">Mix</div></div>
+        <div class="step-item" id="step5"><div class="step-pill-bar"></div><div class="step-label-txt">Export</div></div>
       </div>
       <div class="progress-header">
         <span class="progress-step" id="progressLabel">Initializing...</span>
@@ -536,16 +447,24 @@
 </div>
 
 <!--
-  IMPORTANT: We use @ffmpeg/ffmpeg@0.11.x (UMD build) + @ffmpeg/core@0.11.x.
-  This version runs entirely on the MAIN THREAD — no SharedArrayBuffer, no Worker.
-  This eliminates the "cannot access worker.js from origin" error on GitHub Pages
-  and any host that doesn't set COOP/COEP headers.
+  FFmpeg.wasm — using @ffmpeg/ffmpeg@0.12.x + @ffmpeg/core@0.12.x (ESM build).
+  This version uses a Worker internally but the Worker URL is resolved via
+  importScripts inside the SW-controlled scope, so the COOP/COEP headers the
+  SW injects above make SharedArrayBuffer available.
 -->
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script type="module">
+// ─── IMPORT FFMPEG 0.12 (ESM) ────────────────────────────────────────────────
+import { FFmpeg }    from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
 
-<script>
+// Make helpers available globally so the non-module code below can call them.
+window._FFmpeg    = FFmpeg;
+window._fetchFile = fetchFile;
+window._toBlobURL = toBlobURL;
+
+// ─── APP STATE ────────────────────────────────────────────────────────────────
 const state = { mode: 'fixed', pitch: 'low', clickType: 'wood', videoFile: null, videoDuration: 0 };
-let audioCtx = null;
+let audioCtx   = null;
 let testTimers = {};
 
 function getAudioCtx() {
@@ -554,44 +473,45 @@ function getAudioCtx() {
   return audioCtx;
 }
 
-function setMode(m) {
+// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+window.setMode = function(m) {
   state.mode = m;
   document.getElementById('modeFixed').classList.toggle('active', m === 'fixed');
   document.getElementById('modeRamp').classList.toggle('active', m === 'ramp');
   document.getElementById('fixedSection').style.display = m === 'fixed' ? 'block' : 'none';
-  document.getElementById('rampSection').style.display = m === 'ramp' ? 'block' : 'none';
+  document.getElementById('rampSection').style.display  = m === 'ramp'  ? 'block' : 'none';
   if (m === 'ramp') updateRampPreview();
   updateSummary();
-}
+};
 
-function setPitch(p) {
+window.setPitch = function(p) {
   state.pitch = p;
   ['Low','Mid','High'].forEach(x => document.getElementById('pitch'+x).classList.remove('active'));
   document.getElementById('pitch'+p[0].toUpperCase()+p.slice(1)).classList.add('active');
   updateSummary();
-}
+};
 
-function setClickType(t) {
+window.setClickType = function(t) {
   state.clickType = t;
   ['Wood','Sine','Noise'].forEach(x => document.getElementById('click'+x).classList.remove('active'));
   document.getElementById('click'+t[0].toUpperCase()+t.slice(1)).classList.add('active');
   updateSummary();
-}
+};
 
-function changeBpm(which, delta) {
+window.changeBpm = function(which, delta) {
   const ids = { fixed: 'bpmFixed', start: 'bpmStart', end: 'bpmEnd' };
-  const el = document.getElementById(ids[which]);
-  let val = parseInt(el.value) + delta;
+  const el  = document.getElementById(ids[which]);
+  let val   = parseInt(el.value) + delta;
   val = Math.max(20, Math.min(300, val));
   el.value = val;
   if (which === 'start' || which === 'end') updateRampPreview();
   updateSummary();
-}
+};
 
-function updateSlider(el, valId) {
+window.updateSlider = function(el, valId) {
   document.getElementById(valId).textContent = el.value + '%';
   updateSummary();
-}
+};
 
 function updateRampPreview() {
   const startBpm = parseInt(document.getElementById('bpmStart').value) || 60;
@@ -603,36 +523,27 @@ function updateRampPreview() {
 
   const avgBpm = (startBpm + endBpm) / 2;
   const beats  = Math.round(avgBpm * duration / 60);
-  document.getElementById('rampBeatsLabel').textContent = state.videoDuration
-    ? `~${beats} beats total`
-    : '— beats total';
+  document.getElementById('rampBeatsLabel').textContent = state.videoDuration ? `~${beats} beats total` : '— beats total';
 
   const svg = document.getElementById('rampSvg');
   const W = 300, H = 48, PAD = 6;
-  const minB = Math.min(startBpm, endBpm);
-  const maxB = Math.max(startBpm, endBpm);
+  const minB = Math.min(startBpm, endBpm), maxB = Math.max(startBpm, endBpm);
   const range = maxB - minB || 1;
-
-  const pts = [];
-  const steps = 60;
-  for (let i = 0; i <= steps; i++) {
-    const t   = i / steps;
+  const pts   = [];
+  for (let i = 0; i <= 60; i++) {
+    const t   = i / 60;
     const bpm = startBpm + (endBpm - startBpm) * t;
     const x   = PAD + t * (W - PAD * 2);
     const y   = H - PAD - ((bpm - minB) / range) * (H - PAD * 2);
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
   }
-
   const firstX = PAD, lastX = W - PAD;
-  const fillPath = `M${firstX},${H} ` + pts.map((p,i) => (i===0?'L':'') + p).join(' ') + ` L${lastX},${H} Z`;
-
+  const fillPath = `M${firstX},${H} ` + pts.map((p,i)=>(i===0?'L':'')+p).join(' ') + ` L${lastX},${H} Z`;
   svg.innerHTML = `
-    <defs>
-      <linearGradient id="rampGrad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%"   stop-color="#c8ff00" stop-opacity="0.15"/>
-        <stop offset="100%" stop-color="#c8ff00" stop-opacity="0.35"/>
-      </linearGradient>
-    </defs>
+    <defs><linearGradient id="rampGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#c8ff00" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#c8ff00" stop-opacity="0.35"/>
+    </linearGradient></defs>
     <path d="${fillPath}" fill="url(#rampGrad)"/>
     <polyline points="${pts.join(' ')}" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="${PAD}"   cy="${H - PAD - ((startBpm - minB) / range) * (H - PAD * 2)}" r="3" fill="#c8ff00"/>
@@ -641,18 +552,14 @@ function updateRampPreview() {
 }
 
 function updateSummary() {
-  document.getElementById('sumMode').textContent = state.mode === 'fixed' ? 'Fixed' : 'Ramp';
-  if (state.mode === 'fixed') {
-    document.getElementById('sumBpm').textContent = document.getElementById('bpmFixed').value + ' BPM';
-  } else {
-    document.getElementById('sumBpm').textContent =
-      document.getElementById('bpmStart').value + ' → ' +
-      document.getElementById('bpmEnd').value + ' BPM';
-  }
-  document.getElementById('sumOrig').textContent    = document.getElementById('origVol').value + '%';
-  document.getElementById('sumMetro').textContent   = document.getElementById('metroVol').value + '%';
-  document.getElementById('sumPitch').textContent   = state.pitch[0].toUpperCase() + state.pitch.slice(1);
-  document.getElementById('sumClick').textContent   = state.clickType[0].toUpperCase() + state.clickType.slice(1);
+  document.getElementById('sumMode').textContent  = state.mode === 'fixed' ? 'Fixed' : 'Ramp';
+  document.getElementById('sumBpm').textContent   = state.mode === 'fixed'
+    ? document.getElementById('bpmFixed').value + ' BPM'
+    : document.getElementById('bpmStart').value + ' → ' + document.getElementById('bpmEnd').value + ' BPM';
+  document.getElementById('sumOrig').textContent  = document.getElementById('origVol').value + '%';
+  document.getElementById('sumMetro').textContent = document.getElementById('metroVol').value + '%';
+  document.getElementById('sumPitch').textContent = state.pitch[0].toUpperCase() + state.pitch.slice(1);
+  document.getElementById('sumClick').textContent = state.clickType[0].toUpperCase() + state.clickType.slice(1);
 }
 
 // ─── PROGRESS ────────────────────────────────────────────────────────────────
@@ -675,13 +582,7 @@ function setProgress(pct, label, sub, stepIdx) {
   }
 }
 
-function setProgressIndeterminate(label, sub) {
-  document.getElementById('progressFill').classList.add('indeterminate');
-  document.getElementById('progressLabel').textContent = label;
-  document.getElementById('progressSub').textContent   = sub || '';
-}
-
-// ─── CLICK SOUND (live preview) ──────────────────────────────────────────────
+// ─── CLICK SOUND ─────────────────────────────────────────────────────────────
 function getPitchFreq() { return { low: 180, mid: 440, high: 1000 }[state.pitch]; }
 
 function playClick(ctx, when, gainVal) {
@@ -696,8 +597,7 @@ function playClick(ctx, when, gainVal) {
     gainNode.gain.setValueAtTime(gainVal, when);
     gainNode.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
     osc.connect(gainNode); osc.start(when); osc.stop(when + 0.13);
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'triangle';
+    const osc2 = ctx.createOscillator(); osc2.type = 'triangle';
     osc2.frequency.setValueAtTime(freq * 0.7, when);
     const g2 = ctx.createGain();
     g2.gain.setValueAtTime(gainVal * 0.4, when);
@@ -709,7 +609,7 @@ function playClick(ctx, when, gainVal) {
     gainNode.gain.setValueAtTime(gainVal, when);
     gainNode.gain.exponentialRampToValueAtTime(0.001, when + 0.15);
     osc.connect(gainNode); osc.start(when); osc.stop(when + 0.16);
-  } else if (state.clickType === 'noise') {
+  } else {
     const bufLen = Math.ceil(ctx.sampleRate * 0.05);
     const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
     const data   = buf.getChannelData(0);
@@ -724,12 +624,12 @@ function playClick(ctx, when, gainVal) {
 }
 
 // ─── TEST PLAYBACK ────────────────────────────────────────────────────────────
-function toggleTest(which) {
+window.toggleTest = function(which) {
   const btnId = 'test' + which[0].toUpperCase() + which.slice(1);
   const btn   = document.getElementById(btnId);
   if (testTimers[which]) { stopTest(which); return; }
   btn.classList.add('playing');
-  const ctx   = getAudioCtx();
+  const ctx    = getAudioCtx();
   const bpmIds = { fixed: 'bpmFixed', start: 'bpmStart', end: 'bpmEnd' };
   const bpm    = parseInt(document.getElementById(bpmIds[which]).value);
   const interval = 60 / bpm;
@@ -740,8 +640,8 @@ function toggleTest(which) {
     while (nextBeat < ctx.currentTime + 0.2) {
       playClick(ctx, nextBeat, vol);
       const delay  = (nextBeat - ctx.currentTime) * 1000;
-      const beatEl = document.getElementById(beatId);
       setTimeout(() => {
+        const beatEl = document.getElementById(beatId);
         if (beatEl) { beatEl.classList.add('flash'); setTimeout(() => beatEl.classList.remove('flash'), 80); }
       }, Math.max(0, delay));
       nextBeat += interval;
@@ -749,7 +649,7 @@ function toggleTest(which) {
     testTimers[which] = requestAnimationFrame(schedule);
   }
   schedule();
-}
+};
 
 window.toggleTestVol = function() {
   const which = 'metroVol';
@@ -821,18 +721,16 @@ function loadVideo(file) {
   document.getElementById('processBtn').disabled = false;
   setStatus('Video loaded — configure settings and process', '');
   updateSummary();
-  // Pre-load FFmpeg in the background so it's ready when the user clicks Process
-  loadFFmpeg().catch(e => console.warn('FFmpeg pre-load failed:', e));
 }
 
-function formatTime(s)  { const m = Math.floor(s/60); return `${m}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
+function formatTime(s) { const m = Math.floor(s/60); return `${m}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
 function formatBytes(b) { if (b>1e9) return (b/1e9).toFixed(1)+' GB'; if (b>1e6) return (b/1e6).toFixed(1)+' MB'; return (b/1e3).toFixed(1)+' KB'; }
 function setStatus(msg, type) { const el = document.getElementById('statusMsg'); el.textContent = msg; el.className = 'status '+(type||''); }
 
 // ─── PROCESSING ───────────────────────────────────────────────────────────────
 let _elapsedInterval = null;
 
-async function startProcessing() {
+window.startProcessing = async function() {
   Object.keys(testTimers).forEach(k => stopTest(k));
   const btn = document.getElementById('processBtn');
   btn.disabled = true;
@@ -849,10 +747,10 @@ async function startProcessing() {
   }, 100);
 
   try {
-    const origVolPct  = parseInt(document.getElementById('origVol').value)  / 100;
-    const metroVolPct = parseInt(document.getElementById('metroVol').value) / 100;
-    const duration    = state.videoDuration;
-    const sampleRate  = 44100;
+    const origVolPct   = parseInt(document.getElementById('origVol').value)  / 100;
+    const metroVolPct  = parseInt(document.getElementById('metroVol').value) / 100;
+    const duration     = state.videoDuration;
+    const sampleRate   = 44100;
     const totalSamples = Math.ceil(sampleRate * duration);
 
     setProgress(5, 'Reading video file…', '', 0);
@@ -866,7 +764,6 @@ async function startProcessing() {
 
     setProgress(35, 'Synthesizing metronome…', 'Computing click track…', 2);
     await new Promise(r => setTimeout(r, 16));
-
     const metroBuf = synthesizeMetronome(sampleRate, duration);
 
     setProgress(55, 'Mixing audio tracks…', '', 3);
@@ -877,16 +774,13 @@ async function startProcessing() {
     const result = await muxWithFFmpeg(arrayBuffer, mixedBuffer, sampleRate);
 
     clearInterval(_elapsedInterval);
-    const totalSec = ((Date.now() - startWall) / 1000).toFixed(1);
-    timerEl.textContent = totalSec + 's total';
-
+    timerEl.textContent = ((Date.now() - startWall) / 1000).toFixed(1) + 's total';
     setProgress(100, 'Done!', '', 5);
     setStatus('Processing complete!', 'ok');
-    const dlBtn   = document.getElementById('downloadBtn');
-    dlBtn.href     = result;
+    const dlBtn     = document.getElementById('downloadBtn');
+    dlBtn.href      = result;
     dlBtn.style.display = 'block';
-    dlBtn.download = 'beatsync_' + (state.videoFile?.name?.replace(/\.[^.]+$/, '') || 'output') + '.mp4';
-
+    dlBtn.download  = 'beatsync_' + (state.videoFile?.name?.replace(/\.[^.]+$/, '') || 'output') + '.mp4';
   } catch(err) {
     clearInterval(_elapsedInterval);
     console.error(err);
@@ -895,20 +789,19 @@ async function startProcessing() {
     STEPS.forEach(id => { document.getElementById(id).className = 'step-item'; });
   }
   btn.disabled = false;
-}
+};
 
-// ─── FAST PCM METRONOME SYNTHESIS ────────────────────────────────────────────
+// ─── METRONOME SYNTHESIS ─────────────────────────────────────────────────────
 function synthesizeMetronome(sampleRate, duration) {
-  const beats      = computeBeatTimes(duration);
+  const beats        = computeBeatTimes(duration);
   const totalSamples = Math.ceil(sampleRate * duration);
-  const data       = new Float32Array(totalSamples);
-  const freq       = getPitchFreq();
-  const clickType  = state.clickType;
+  const data         = new Float32Array(totalSamples);
+  const freq         = getPitchFreq();
+  const clickType    = state.clickType;
 
   for (const beatTime of beats) {
     if (beatTime + 0.2 > duration) continue;
     const startIdx = Math.round(beatTime * sampleRate);
-
     if (clickType === 'wood') {
       const f0 = freq * 2, f1 = freq * 0.5;
       const k  = Math.log(f1 / f0) / 0.08;
@@ -916,21 +809,19 @@ function synthesizeMetronome(sampleRate, duration) {
       const gainDecay1 = -Math.log(0.001) / 0.12;
       let phase1 = 0;
       for (let i = 0; i < len1; i++) {
-        const t    = i / sampleRate;
-        const fNow = f0 * Math.exp(k * Math.min(t, 0.08));
-        phase1    += 2 * Math.PI * fNow / sampleRate;
+        const t = i / sampleRate;
+        phase1 += 2 * Math.PI * (f0 * Math.exp(k * Math.min(t, 0.08))) / sampleRate;
         data[startIdx + i] += Math.sin(phase1) * Math.exp(-gainDecay1 * t);
       }
       const len2 = Math.min(Math.ceil(0.11 * sampleRate), totalSamples - startIdx);
       const gainDecay2 = -Math.log(0.001) / 0.10;
       for (let i = 0; i < len2; i++) {
-        const t   = i / sampleRate;
-        const ph  = (freq * 0.7 * t) % 1;
-        const tri = ph < 0.5 ? 4*ph - 1 : 3 - 4*ph;
-        data[startIdx + i] += tri * 0.4 * Math.exp(-gainDecay2 * t);
+        const t  = i / sampleRate;
+        const ph = (freq * 0.7 * t) % 1;
+        data[startIdx + i] += (ph < 0.5 ? 4*ph - 1 : 3 - 4*ph) * 0.4 * Math.exp(-gainDecay2 * t);
       }
     } else if (clickType === 'sine') {
-      const len  = Math.min(Math.ceil(0.16 * sampleRate), totalSamples - startIdx);
+      const len   = Math.min(Math.ceil(0.16 * sampleRate), totalSamples - startIdx);
       const decay = -Math.log(0.001) / 0.15;
       for (let i = 0; i < len; i++) {
         const t = i / sampleRate;
@@ -941,17 +832,16 @@ function synthesizeMetronome(sampleRate, duration) {
       const decay = -Math.log(0.001) / 0.08;
       const omega = 2 * Math.PI * freq / sampleRate;
       const Q     = 2;
-      const cosW  = Math.cos(omega);
-      const sinW  = Math.sin(omega);
+      const cosW  = Math.cos(omega), sinW = Math.sin(omega);
       const alpha = sinW / (2 * Q);
       const b0 = alpha, b2 = -alpha;
       const a0 = 1 + alpha, a1 = -2 * cosW, a2 = 1 - alpha;
       const n   = 1 / a0;
       let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
       for (let i = 0; i < len; i++) {
-        const t  = i / sampleRate;
-        const x  = Math.random() * 2 - 1;
-        const y  = (b0*x - b2*x2 - a1*y1 - a2*y2) * n;
+        const t = i / sampleRate;
+        const x = Math.random() * 2 - 1;
+        const y = (b0*x - b2*x2 - a1*y1 - a2*y2) * n;
         x2 = x1; x1 = x; y2 = y1; y1 = y;
         data[startIdx + i] += y * Math.exp(-decay * t);
       }
@@ -959,17 +849,12 @@ function synthesizeMetronome(sampleRate, duration) {
   }
 
   let audioBuf;
-  try {
-    audioBuf = new AudioBuffer({ numberOfChannels: 1, length: totalSamples, sampleRate });
-  } catch(e) {
-    const tmp = new OfflineAudioContext(1, 2, sampleRate);
-    audioBuf  = tmp.createBuffer(1, totalSamples, sampleRate);
-  }
+  try { audioBuf = new AudioBuffer({ numberOfChannels: 1, length: totalSamples, sampleRate }); }
+  catch(e) { audioBuf = new OfflineAudioContext(1, 2, sampleRate).createBuffer(1, totalSamples, sampleRate); }
   audioBuf.getChannelData(0).set(data);
   return audioBuf;
 }
 
-// ─── BEAT TIME COMPUTATION ────────────────────────────────────────────────────
 function computeBeatTimes(duration) {
   const beats    = [];
   const bpmFixed = parseInt(document.getElementById('bpmFixed').value);
@@ -985,8 +870,7 @@ function computeBeatTimes(duration) {
       const interval = 60 / bpmStart;
       for (let t = 0; t < duration; t += interval) beats.push(t);
     } else {
-      const A = diff / (2 * duration);
-      const B = bpmStart;
+      const A = diff / (2 * duration), B = bpmStart;
       for (let n = 0; ; n++) {
         const disc = B * B + 4 * A * 60 * n;
         if (disc < 0) break;
@@ -999,14 +883,12 @@ function computeBeatTimes(duration) {
   return beats;
 }
 
-// ─── MIX AUDIO ───────────────────────────────────────────────────────────────
 function mixAudio(origBuffer, metroBuffer, origGain, metroGain, sampleRate, totalSamples) {
   const mixed  = new Float32Array(totalSamples * 2);
   const metro0 = metroBuffer.getChannelData(0);
   const origL  = origBuffer && origBuffer.numberOfChannels > 0 ? origBuffer.getChannelData(0) : null;
   const origR  = origBuffer && origBuffer.numberOfChannels > 1 ? origBuffer.getChannelData(1) : origL;
   const origLen = origL ? origL.length : 0;
-
   for (let i = 0; i < totalSamples; i++) {
     const oL = (origL && i < origLen) ? origL[i] * origGain : 0;
     const oR = (origR && i < origLen) ? origR[i] * origGain : oL;
@@ -1017,27 +899,19 @@ function mixAudio(origBuffer, metroBuffer, origGain, metroGain, sampleRate, tota
   return { data: mixed, sampleRate, channels: 2, length: totalSamples };
 }
 
-// ─── WAV ENCODER ─────────────────────────────────────────────────────────────
 function encodeWav(interleavedF32, sampleRate, numChannels) {
-  const numSamples = interleavedF32.length / numChannels;
-  const bytesPerSample = 2; // 16-bit PCM
-  const dataSize = numSamples * numChannels * bytesPerSample;
+  const numSamples     = interleavedF32.length / numChannels;
+  const bytesPerSample = 2;
+  const dataSize       = numSamples * numChannels * bytesPerSample;
   const buffer = new ArrayBuffer(44 + dataSize);
   const view   = new DataView(buffer);
-  const write  = (off, str) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
-  write(0,  'RIFF');
-  view.setUint32(4,  36 + dataSize, true);
-  write(8,  'WAVE');
-  write(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1,  true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
+  const write  = (off, str) => { for (let i=0; i<str.length; i++) view.setUint8(off+i, str.charCodeAt(i)); };
+  write(0, 'RIFF'); view.setUint32(4, 36+dataSize, true); write(8, 'WAVE');
+  write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true); view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
-  view.setUint16(32, numChannels * bytesPerSample, true);
-  view.setUint16(34, 16, true);
-  write(36, 'data');
-  view.setUint32(40, dataSize, true);
+  view.setUint16(32, numChannels * bytesPerSample, true); view.setUint16(34, 16, true);
+  write(36, 'data'); view.setUint32(40, dataSize, true);
   let offset = 44;
   for (let i = 0; i < interleavedF32.length; i++) {
     const s = Math.max(-1, Math.min(1, interleavedF32[i]));
@@ -1047,48 +921,36 @@ function encodeWav(interleavedF32, sampleRate, numChannels) {
   return buffer;
 }
 
-// ─── FFMPEG 0.11.x LOADER (main-thread, no Worker, no CORS issues) ────────────
-//
-// @ffmpeg/ffmpeg@0.11.x exposes a global { createFFmpeg, fetchFile } via the UMD
-// bundle loaded above. It runs on the main thread — no SharedArrayBuffer and no
-// Worker are needed, which avoids the GitHub Pages cross-origin Worker error.
-//
+// ─── FFMPEG 0.12 MUX ─────────────────────────────────────────────────────────
 let _ffmpegInstance = null;
-let _ffmpegLoading  = null;
 
-async function loadFFmpeg() {
+async function loadFFmpegInstance() {
   if (_ffmpegInstance) return _ffmpegInstance;
-  if (_ffmpegLoading)  return _ffmpegLoading;
 
-  _ffmpegLoading = (async () => {
-    const { createFFmpeg } = window.FFmpeg; // from the UMD script tag above
+  const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+  const ffmpeg  = new window._FFmpeg();
 
-    const ffmpeg = createFFmpeg({
-      // Use jsDelivr for the core wasm — same CDN, reliable CORS headers
-      corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
-      log: true,
-      progress: ({ ratio }) => {
-        if (ratio >= 0 && ratio <= 1) {
-          const pct = 85 + Math.floor(ratio * 12);
-          setProgress(pct, 'Muxing video + audio…', `FFmpeg: ${Math.round(ratio * 100)}%`, 4);
-        }
-      },
-    });
+  ffmpeg.on('log', ({ message }) => console.log('[ffmpeg]', message));
+  ffmpeg.on('progress', ({ progress }) => {
+    if (progress >= 0 && progress <= 1) {
+      setProgress(85 + Math.floor(progress * 12), 'Muxing video + audio…', `FFmpeg: ${Math.round(progress * 100)}%`, 4);
+    }
+  });
 
-    await ffmpeg.load();
-    _ffmpegInstance = ffmpeg;
-    return ffmpeg;
-  })();
+  await ffmpeg.load({
+    coreURL:    await window._toBlobURL(`${baseURL}/ffmpeg-core.js`,   'text/javascript'),
+    wasmURL:    await window._toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    workerURL:  await window._toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+  });
 
-  return _ffmpegLoading;
+  _ffmpegInstance = ffmpeg;
+  return ffmpeg;
 }
 
-// ─── MAIN MUX FUNCTION ────────────────────────────────────────────────────────
 async function muxWithFFmpeg(videoArrayBuffer, mixedAudio, sampleRate) {
   setProgress(72, 'Loading FFmpeg.wasm…', 'First run downloads ~30 MB…', 4);
-  const ffmpeg = await loadFFmpeg();
-
-  const { fetchFile } = window.FFmpeg;
+  const ffmpeg    = await loadFFmpegInstance();
+  const fetchFile = window._fetchFile;
 
   const origExt = (state.videoFile.name.split('.').pop() || 'mp4').toLowerCase();
   const inName  = `input.${origExt}`;
@@ -1096,17 +958,14 @@ async function muxWithFFmpeg(videoArrayBuffer, mixedAudio, sampleRate) {
   setProgress(78, 'Writing files to FFmpeg…', 'Transferring video + audio data…', 4);
   await new Promise(r => setTimeout(r, 0));
 
-  // Write original video bytes into FFmpeg's virtual FS
-  ffmpeg.FS('writeFile', inName, await fetchFile(new Blob([videoArrayBuffer])));
-
-  // Build WAV and write it too
+  await ffmpeg.writeFile(inName, await fetchFile(new Blob([videoArrayBuffer])));
   const wavBuffer = encodeWav(mixedAudio.data, sampleRate, mixedAudio.channels);
-  ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(new Blob([wavBuffer])));
+  await ffmpeg.writeFile('audio.wav', await fetchFile(new Blob([wavBuffer])));
 
   setProgress(85, 'Muxing video + audio…', 'Encoding audio track, copying video…', 4);
   await new Promise(r => setTimeout(r, 0));
 
-  await ffmpeg.run(
+  await ffmpeg.exec([
     '-i', inName,
     '-i', 'audio.wav',
     '-map', '0:v:0',
@@ -1117,19 +976,18 @@ async function muxWithFFmpeg(videoArrayBuffer, mixedAudio, sampleRate) {
     '-movflags', '+faststart',
     '-y',
     'output.mp4'
-  );
+  ]);
 
   setProgress(98, 'Finalising MP4…', 'Reading output…', 4);
-  const data = ffmpeg.FS('readFile', 'output.mp4');
-
-  // Clean up virtual FS
-  try { ffmpeg.FS('unlink', inName); }      catch(_) {}
-  try { ffmpeg.FS('unlink', 'audio.wav'); } catch(_) {}
-  try { ffmpeg.FS('unlink', 'output.mp4'); } catch(_) {}
+  const data = await ffmpeg.readFile('output.mp4');
+  try { await ffmpeg.deleteFile(inName); }       catch(_) {}
+  try { await ffmpeg.deleteFile('audio.wav'); }  catch(_) {}
+  try { await ffmpeg.deleteFile('output.mp4'); } catch(_) {}
 
   return URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
 }
 
+// ─── INIT ─────────────────────────────────────────────────────────────────────
 updateSummary();
 updateRampPreview();
 </script>
