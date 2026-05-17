@@ -393,7 +393,6 @@ window.onPitchChange = function() {
   const hz = getPitch();
   document.getElementById('pitchVal').textContent  = hz + ' Hz';
   document.getElementById('pitchName').textContent = freqToNote(hz);
-  // restart pitch test with new freq if running
   if (pitchTestTimer) { stopPitchTest(); startPitchTest(); }
 };
 
@@ -561,11 +560,9 @@ function computeBeatTimes(duration) {
   return beats;
 }
 
-// Synthesise a single click at a given base frequency
-// f0 = base (attack) freq, chirps down ~2 octaves over 80ms, then decays
 function makeClickParams() {
   const f0 = getPitch();
-  const f1 = Math.max(40, f0 * 0.35); // chirp down to ~35% of base
+  const f1 = Math.max(40, f0 * 0.35);
   return { f0, f1 };
 }
 
@@ -606,11 +603,19 @@ function float32ToInt16(f32) {
 }
 
 // ── CLICK PLAYER (live) ──────────────────────────────────────────────────────
+// FIX: Route through a StereoPannerNode at pan=0 to force centered stereo output.
+// Without this, a mono OscillatorNode can land only on the left channel in some browsers.
 function playClickNow(ctx, when) {
-  const f0   = getPitch();
-  const f1   = Math.max(40, f0 * 0.35);
+  const f0 = getPitch();
+  const f1 = Math.max(40, f0 * 0.35);
+
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = 0; // center
+  panner.connect(ctx.destination);
+
   const gain = ctx.createGain();
-  gain.connect(ctx.destination);
+  gain.connect(panner);
+
   const osc  = ctx.createOscillator();
   osc.type   = 'sine';
   osc.frequency.setValueAtTime(f0, when);
@@ -666,7 +671,6 @@ function startPitchTest() {
   const btn = document.getElementById('testPitch');
   btn.classList.add('playing');
   const ctx  = getAudioCtx();
-  // play at a moderate 80 BPM to demo the sound
   const ivl  = 60 / 80;
   let next   = ctx.currentTime + 0.05;
   function sched() {
@@ -723,17 +727,21 @@ window.startProcessing = async function() {
     const pcm   = synthesizeMetronomePCM(sampleRate, duration);
     const int16 = float32ToInt16(pcm);
 
-    setProgress(20, 'Encoding MP3…', '128 kbps · mono', 1);
+    // FIX: Encode as stereo (2 channels) by duplicating the mono track.
+    // This ensures the MP3 plays centered on all devices and players.
+    setProgress(20, 'Encoding MP3…', '128 kbps · stereo', 1);
     await tick();
 
-    const mp3enc = new lamejs.Mp3Encoder(1, sampleRate, 128);
+    const mp3enc = new lamejs.Mp3Encoder(2, sampleRate, 128);
     const chunks = [];
     const BLOCK  = 1152;
     const total  = int16.length;
     let lastYield = 0;
 
     for (let off = 0; off < total; off += BLOCK) {
-      const enc = mp3enc.encodeBuffer(int16.subarray(off, off + BLOCK));
+      const chunk = int16.subarray(off, off + BLOCK);
+      // Both channels get the same data (identical left & right = centered)
+      const enc = mp3enc.encodeBuffer(chunk, chunk);
       if (enc.length > 0) chunks.push(new Uint8Array(enc));
       if (off - lastYield > sampleRate * 5) {
         lastYield = off;
