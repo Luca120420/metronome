@@ -3,10 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BeatSync — Video Metronome</title>
-<link rel="icon" href="logo.ico" type="image/x-icon">
-
-
+<title>BeatSync — Metronome MP3</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Bebas+Neue&display=swap');
   :root {
@@ -27,7 +24,11 @@
     color: var(--text);
     font-family: 'DM Mono', monospace;
     min-height: 100vh;
-    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 40px 20px 60px;
   }
   body::before {
     content: '';
@@ -37,612 +38,399 @@
     pointer-events: none;
     z-index: 9999;
   }
-  header {
-    border-bottom: 1px solid var(--border);
-    padding: 20px 40px;
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-    background: var(--surface);
-  }
-  header h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2.4rem;
-    letter-spacing: 4px;
-    color: var(--accent);
-    text-shadow: 0 0 30px rgba(200,255,0,0.3);
-  }
-  header span { font-size: 0.7rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
-  .main { display: grid; grid-template-columns: 1fr 380px; min-height: calc(100vh - 65px); }
-  .left-panel { padding: 32px 40px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 28px; }
-  .right-panel { padding: 28px; display: flex; flex-direction: column; gap: 20px; background: var(--surface); }
+  .card { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 22px; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 2px; }
+  header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 2.6rem; letter-spacing: 5px; color: var(--accent); text-shadow: 0 0 30px rgba(200,255,0,0.25); }
+  header span { font-size: 0.65rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
   .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .section-header { padding: 12px 18px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-  .section-label { font-size: 0.65rem; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
-  .section-num { font-size: 0.6rem; color: var(--muted); margin-left: auto; }
-  .section-body { padding: 20px 18px; }
-  .dropzone {
-    border: 2px dashed var(--border); border-radius: var(--radius);
-    padding: 48px 24px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative;
-  }
-  .dropzone:hover, .dropzone.drag-over { border-color: var(--accent); background: rgba(200,255,0,0.03); }
-  .dropzone-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
-  .dropzone p { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
-  .dropzone p strong { color: var(--text); display: block; font-size: 0.85rem; margin-bottom: 4px; }
-  .dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  #videoContainer { display: none; }
-  video { width: 100%; border-radius: var(--radius); background: #000; max-height: 320px; object-fit: contain; }
-  .video-info { margin-top: 10px; display: flex; gap: 16px; font-size: 0.65rem; color: var(--muted); }
-  .video-info span { display: flex; gap: 4px; align-items: center; }
-  .video-info strong { color: var(--text); }
-  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  .control-row:last-child { margin-bottom: 0; }
-  .control-label { font-size: 0.65rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); min-width: 100px; flex-shrink: 0; }
-  .toggle-group { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .toggle-group button { padding: 6px 14px; background: transparent; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.7rem; cursor: pointer; transition: all 0.15s; letter-spacing: 1px; }
-  .toggle-group button.active { background: var(--accent); color: #000; font-weight: 500; }
-  .num-input { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: 'DM Mono', monospace; font-size: 1.1rem; padding: 6px 12px; width: 80px; text-align: center; transition: border-color 0.15s; }
-  .num-input:focus { outline: none; border-color: var(--accent); }
-  .num-input-unit { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; }
-  .slider-wrap { flex: 1; display: flex; align-items: center; gap: 10px; }
-  input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 2px; background: var(--border); border-radius: 2px; outline: none; cursor: pointer; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 8px rgba(200,255,0,0.4); transition: transform 0.1s; }
-  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); }
-  .slider-val { font-size: 0.75rem; color: var(--text); min-width: 36px; text-align: right; }
+  .section-header { padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-label { font-size: 0.6rem; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+  .section-num { font-size: 0.55rem; color: var(--muted); }
+  .section-body { padding: 18px 16px; }
 
-  .test-btn {
-    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
-    background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
-    color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem;
-    letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
-    white-space: nowrap; flex-shrink: 0;
-  }
+  /* Source toggle */
+  .source-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+  .source-toggle button { flex: 1; padding: 8px 14px; background: transparent; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.15s; letter-spacing: 1.5px; text-transform: uppercase; }
+  .source-toggle button.active { background: var(--accent); color: #000; font-weight: 500; }
+
+  /* Dropzone */
+  .dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .dropzone:hover, .dropzone.drag-over { border-color: var(--accent); background: rgba(200,255,0,0.03); }
+  .dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .dropzone label { position: absolute; inset: 0; cursor: pointer; z-index: 1; }
+  .dz-icon { font-size: 2rem; margin-bottom: 10px; opacity: 0.4; }
+  .dz-text strong { display: block; font-size: 0.82rem; color: var(--text); margin-bottom: 3px; }
+  .dz-text span { font-size: 0.68rem; color: var(--muted); }
+  .video-info { display: none; margin-top: 14px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent); font-size: 0.68rem; color: var(--muted); gap: 20px; }
+  .video-info.visible { display: flex; align-items: center; }
+  .vi-label { font-size: 0.55rem; letter-spacing: 1.5px; text-transform: uppercase; display: block; margin-bottom: 2px; }
+  .video-info strong { color: var(--accent); font-size: 0.9rem; }
+
+  /* Manual duration */
+  .manual-duration { display: none; }
+  .manual-duration.visible { display: block; }
+  .dur-row { display: flex; align-items: center; gap: 10px; }
+  .dur-field { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dur-field label { font-size: 0.5rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .dur-input { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: 'DM Mono', monospace; font-size: 1.3rem; padding: 8px 6px; width: 62px; text-align: center; transition: border-color 0.15s; }
+  .dur-input:focus { outline: none; border-color: var(--accent); }
+  .dur-sep { font-size: 1.4rem; color: var(--muted); padding-bottom: 18px; }
+  .dur-total { margin-top: 12px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent); display: flex; align-items: center; gap: 16px; font-size: 0.68rem; color: var(--muted); }
+  .dur-total strong { color: var(--accent); font-size: 0.9rem; }
+
+  .control-row { display: flex; align-items: center; gap: 12px; }
+  .control-row + .control-row { margin-top: 14px; }
+  .control-label { font-size: 0.6rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); min-width: 80px; flex-shrink: 0; }
+  .toggle-group { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .toggle-group button { padding: 6px 14px; background: transparent; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.68rem; cursor: pointer; transition: all 0.15s; letter-spacing: 1px; }
+  .toggle-group button.active { background: var(--accent); color: #000; font-weight: 500; }
+  .bpm-row { display: flex; align-items: center; gap: 4px; }
+  .num-input { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: 'DM Mono', monospace; font-size: 1.1rem; padding: 6px 10px; width: 72px; text-align: center; transition: border-color 0.15s; }
+  .num-input:focus { outline: none; border-color: var(--accent); }
+  .bpm-arrow { background: transparent; border: 1px solid var(--border); color: var(--muted); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.68rem; transition: all 0.1s; border-radius: var(--radius); font-family: 'DM Mono', monospace; flex-shrink: 0; }
+  .bpm-arrow:hover { border-color: var(--accent); color: var(--accent); }
+  .num-input-unit { font-size: 0.6rem; color: var(--muted); letter-spacing: 1px; }
+  .test-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
   .test-btn:hover { border-color: var(--accent2); color: var(--accent2); }
   .test-btn.playing { border-color: var(--danger); color: var(--danger); background: rgba(255,51,102,0.05); }
-  .test-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 0.6s infinite; display: none; flex-shrink: 0; }
+  .test-btn .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 0.6s infinite; display: none; }
   .test-btn.playing .dot { display: block; }
-  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
-
-  .bpm-big { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; color: var(--accent); letter-spacing: 4px; line-height: 1; }
-  .bpm-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-  .bpm-row .num-input { width: 72px; }
-  .bpm-arrow { background: transparent; border: 1px solid var(--border); color: var(--muted); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.7rem; transition: all 0.1s; border-radius: var(--radius); font-family: 'DM Mono', monospace; flex-shrink: 0; }
-  .bpm-arrow:hover { border-color: var(--accent); color: var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+  .beat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.05s; }
+  .beat-dot.flash { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
   #rampSection { display: none; }
-
-  .bpm-blocks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-  .bpm-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 12px; }
-  .bpm-block-label { font-size: 0.58rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-  .bpm-block .bpm-row { flex-wrap: wrap; gap: 3px; }
-  .bpm-block .num-input { width: 82px; font-size: 1rem; }
-  .bpm-block-footer { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-
-  .ramp-preview { margin-top: 16px; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent); }
-  .ramp-preview-label { font-size: 0.6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-  .ramp-svg-wrap { width: 100%; height: 48px; }
-  .ramp-info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.65rem; color: var(--muted); }
-  .ramp-info span strong { color: var(--accent); font-size: 0.8rem; }
-
-  .beat-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.05s; flex-shrink: 0; }
-  .beat-indicator.flash { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
-
+  .bpm-blocks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  .bpm-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .bpm-block-label { font-size: 0.55rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .bpm-block .num-input { width: 76px; font-size: 1rem; }
+  .bpm-block-footer { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .ramp-preview { margin-top: 14px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent); }
+  .ramp-preview-label { font-size: 0.55rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .ramp-svg-wrap { width: 100%; height: 44px; }
+  .ramp-info { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.6rem; color: var(--muted); }
+  .ramp-info span strong { color: var(--accent); font-size: 0.75rem; }
   .render-section { display: none; }
-
-  .steps-row { display: flex; gap: 6px; margin-bottom: 14px; }
-  .step-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-  .step-pill-bar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; transition: background 0.3s; }
-  .step-label-txt { font-size: 0.48rem; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); transition: color 0.3s; }
-  .step-item.done .step-pill-bar { background: var(--accent); }
-  .step-item.active .step-pill-bar { background: var(--accent2); animation: breathe 0.8s ease infinite; }
-  .step-item.done .step-label-txt { color: var(--accent); }
-  .step-item.active .step-label-txt { color: var(--accent2); }
+  .steps-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .step-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .step-pill { width: 100%; height: 3px; background: var(--border); border-radius: 2px; transition: background 0.3s; }
+  .step-txt { font-size: 0.45rem; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); }
+  .step-item.done .step-pill { background: var(--accent); }
+  .step-item.done .step-txt { color: var(--accent); }
+  .step-item.active .step-pill { background: var(--accent2); animation: breathe 0.8s ease infinite; }
+  .step-item.active .step-txt { color: var(--accent2); }
   @keyframes breathe { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-  .progress-track { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); height: 8px; overflow: hidden; margin: 8px 0 4px; position: relative; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #d9ff1a 100%); width: 0%; transition: width 0.25s ease; box-shadow: 0 0 10px rgba(200,255,0,0.4); border-radius: var(--radius); }
-  .progress-fill.indeterminate { width: 40% !important; animation: slide 1.2s ease-in-out infinite; }
-  @keyframes slide { 0% { transform: translateX(-150%); } 100% { transform: translateX(350%); } }
+  .progress-track { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); height: 6px; overflow: hidden; margin: 6px 0 3px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #d9ff1a); width: 0%; transition: width 0.25s ease; box-shadow: 0 0 8px rgba(200,255,0,0.4); border-radius: var(--radius); }
   .progress-header { display: flex; justify-content: space-between; align-items: center; }
-  .progress-step { font-size: 0.65rem; color: var(--text); letter-spacing: 1px; }
-  .progress-pct { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); letter-spacing: 2px; }
-  .progress-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-  .progress-sub { font-size: 0.6rem; color: var(--muted); letter-spacing: 1px; }
-  .elapsed-timer { font-size: 0.58rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-  .download-btn { display: none; width: 100%; padding: 14px; background: var(--accent); color: #000; border: none; border-radius: var(--radius); font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 3px; cursor: pointer; transition: all 0.15s; text-align: center; text-decoration: none; }
+  .progress-step { font-size: 0.6rem; color: var(--text); }
+  .progress-pct { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--accent); letter-spacing: 2px; }
+  .progress-footer { display: flex; justify-content: space-between; margin-top: 3px; font-size: 0.55rem; color: var(--muted); }
+  #processBtn { width: 100%; padding: 15px; background: transparent; color: var(--accent); border: 2px solid var(--accent); border-radius: var(--radius); font-family: 'Bebas Neue', sans-serif; font-size: 1.25rem; letter-spacing: 4px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  #processBtn::before { content:''; position:absolute; inset:0; background:var(--accent); transform:scaleX(0); transform-origin:left; transition:transform 0.25s; z-index:0; }
+  #processBtn:hover::before { transform:scaleX(1); }
+  #processBtn:hover { color:#000; }
+  #processBtn span { position:relative; z-index:1; }
+  #processBtn:disabled { opacity:0.3; cursor:not-allowed; }
+  #processBtn:disabled::before { transform:scaleX(0)!important; }
+  .download-btn { display: none; width: 100%; padding: 14px; background: var(--accent); color: #000; border: none; border-radius: var(--radius); font-family: 'Bebas Neue', sans-serif; font-size: 1.15rem; letter-spacing: 3px; cursor: pointer; text-align: center; text-decoration: none; transition: all 0.15s; }
   .download-btn:hover { background: #d9ff1a; transform: translateY(-1px); }
-  #processBtn { width: 100%; padding: 16px; background: transparent; color: var(--accent); border: 2px solid var(--accent); border-radius: var(--radius); font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 4px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
-  #processBtn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.25s; z-index: 0; }
-  #processBtn:hover::before { transform: scaleX(1); }
-  #processBtn:hover { color: #000; }
-  #processBtn span { position: relative; z-index: 1; }
-  #processBtn:disabled { opacity: 0.3; cursor: not-allowed; }
-  #processBtn:disabled::before { transform: scaleX(0) !important; }
-  .status { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; text-align: center; min-height: 16px; }
+  .status { font-size: 0.62rem; color: var(--muted); letter-spacing: 1px; text-align: center; min-height: 14px; }
   .status.error { color: var(--danger); }
   .status.ok { color: var(--accent); }
-  .divider { height: 1px; background: var(--border); margin: 4px 0; }
-  .note { font-size: 0.6rem; color: var(--muted); line-height: 1.6; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent2); }
-
-  .right-panel-header { margin: -28px -28px 0; padding: 16px 28px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; align-items: center; }
-
-  @media (max-width: 900px) {
-    .main { grid-template-columns: 1fr; }
-    .right-panel { border-top: 1px solid var(--border); }
-    .left-panel, .right-panel { padding: 20px; }
-    header { padding: 16px 20px; }
-    .bpm-blocks-grid { grid-template-columns: 1fr; }
-  }
+  .note { font-size: 0.58rem; color: var(--muted); line-height: 1.7; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent2); }
 </style>
 </head>
 <body>
-<header>
-  <h1>BeatSync</h1>
-  <span>Video Metronome Processor</span>
-</header>
+<div class="card">
 
-<div class="main">
-  <div class="left-panel">
+  <header>
+    <h1>BeatSync</h1>
+    <span>Metronome MP3 Generator</span>
+  </header>
 
-    <!-- 01 · VIDEO INPUT -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-label">Video Input</span>
-        <span class="section-num">01</span>
+  <!-- 01 DURATION SOURCE -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-label">Duration</span>
+      <span class="section-num">01</span>
+    </div>
+    <div class="section-body">
+
+      <div class="source-toggle">
+        <button id="srcVideo" class="active" onclick="setSource('video')">▶ From Video</button>
+        <button id="srcManual" onclick="setSource('manual')">⏱ Manual Entry</button>
       </div>
-      <div class="section-body">
+
+      <!-- Video drop -->
+      <div id="videoSource">
         <div class="dropzone" id="dropzone">
           <input type="file" accept="video/*" id="fileInput">
-          <label for="fileInput" style="position:absolute;inset:0;cursor:pointer;z-index:1;"></label>
-          <div class="dropzone-icon" style="cursor:pointer;">▶</div>
-          <p><strong>Drop video here or click to browse</strong>MP4, MOV, AVI, MKV, WebM — any length</p>
+          <label for="fileInput"></label>
+          <div class="dz-icon">▶</div>
+          <div class="dz-text">
+            <strong>Drop video or click to browse</strong>
+            <span>Duration is read from the file — no video is uploaded</span>
+          </div>
         </div>
-        <div id="videoContainer" style="margin-top:16px;display:none;">
-          <canvas id="firstFrame" style="width:100%;max-height:160px;object-fit:contain;border-radius:var(--radius);background:#000;display:block;"></canvas>
-          <video id="videoPlayer" style="display:none;"></video>
-          <div class="video-info">
-            <span>DURATION <strong id="vDuration">—</strong></span>
-            <span>SIZE <strong id="vSize">—</strong></span>
-            <span>TYPE <strong id="vType">—</strong></span>
+        <div class="video-info" id="videoInfo">
+          <div>
+            <span class="vi-label">Duration</span>
+            <strong id="vDuration">—</strong>
+          </div>
+          <div>
+            <span class="vi-label">File</span>
+            <span id="vName" style="color:var(--text);font-size:0.68rem;">—</span>
           </div>
         </div>
       </div>
+
+      <!-- Manual duration -->
+      <div class="manual-duration" id="manualSource">
+        <div class="dur-row">
+          <div class="dur-field">
+            <label for="durH">Hours</label>
+            <input type="number" class="dur-input" id="durH" value="0" min="0" max="23" oninput="onManualChange()">
+          </div>
+          <div class="dur-sep">:</div>
+          <div class="dur-field">
+            <label for="durM">Minutes</label>
+            <input type="number" class="dur-input" id="durM" value="3" min="0" max="59" oninput="onManualChange()">
+          </div>
+          <div class="dur-sep">:</div>
+          <div class="dur-field">
+            <label for="durS">Seconds</label>
+            <input type="number" class="dur-input" id="durS" value="30" min="0" max="59" oninput="onManualChange()">
+          </div>
+        </div>
+        <div class="dur-total" id="durTotal">
+          <div>
+            <span class="vi-label">Total Duration</span>
+            <strong id="durTotalLabel">3:30</strong>
+          </div>
+          <div>
+            <span class="vi-label">Seconds</span>
+            <strong id="durTotalSec">210</strong>
+          </div>
+        </div>
+      </div>
+
     </div>
+  </div>
 
-    <!-- 02 · TEMPO MODE -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-label">Tempo Mode</span>
-        <span class="section-num">02</span>
-      </div>
-      <div class="section-body">
-        <div class="control-row">
-          <span class="control-label">Mode</span>
-          <div class="toggle-group">
-            <button id="modeFixed" class="active" onclick="setMode('fixed')">FIXED BPM</button>
-            <button id="modeRamp" onclick="setMode('ramp')">RAMP UP</button>
-          </div>
+  <!-- 02 TEMPO -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-label">Tempo</span>
+      <span class="section-num">02</span>
+    </div>
+    <div class="section-body">
+      <div class="control-row">
+        <span class="control-label">Mode</span>
+        <div class="toggle-group">
+          <button id="modeFixed" class="active" onclick="setMode('fixed')">FIXED</button>
+          <button id="modeRamp"  onclick="setMode('ramp')">RAMP</button>
         </div>
+      </div>
 
-        <!-- FIXED BPM -->
-        <div id="fixedSection">
-          <div class="control-row" style="margin-top:8px;">
-            <span class="control-label">BPM</span>
+      <div id="fixedSection">
+        <div class="control-row" style="margin-top:14px;">
+          <span class="control-label">BPM</span>
+          <div class="bpm-row">
+            <button class="bpm-arrow" onclick="changeBpm('fixed',-10)">−10</button>
+            <button class="bpm-arrow" onclick="changeBpm('fixed',-1)">−</button>
+            <input type="number" class="num-input" id="bpmFixed" value="60" min="20" max="300">
+            <button class="bpm-arrow" onclick="changeBpm('fixed',+1)">+</button>
+            <button class="bpm-arrow" onclick="changeBpm('fixed',+10)">+10</button>
+          </div>
+          <span class="num-input-unit">BPM</span>
+          <button class="test-btn" id="testFixed" onclick="toggleTest('fixed')"><span class="dot"></span>TEST</button>
+          <div class="beat-dot" id="beatFixed"></div>
+        </div>
+      </div>
+
+      <div id="rampSection">
+        <div class="bpm-blocks-grid">
+          <div class="bpm-block">
+            <div class="bpm-block-label">Start BPM</div>
             <div class="bpm-row">
-              <button class="bpm-arrow" onclick="changeBpm('fixed',-10)">−10</button>
-              <button class="bpm-arrow" onclick="changeBpm('fixed',-1)">−</button>
-              <input type="number" class="num-input" id="bpmFixed" value="60" min="20" max="300">
-              <button class="bpm-arrow" onclick="changeBpm('fixed',+1)">+</button>
-              <button class="bpm-arrow" onclick="changeBpm('fixed',+10)">+10</button>
+              <button class="bpm-arrow" onclick="changeBpm('start',-10)">−10</button>
+              <button class="bpm-arrow" onclick="changeBpm('start',-1)">−</button>
+              <input type="number" class="num-input" id="bpmStart" value="60" min="20" max="300" oninput="updateRampPreview()">
+              <button class="bpm-arrow" onclick="changeBpm('start',+1)">+</button>
+              <button class="bpm-arrow" onclick="changeBpm('start',+10)">+10</button>
             </div>
-            <span class="num-input-unit">BPM</span>
-            <button class="test-btn" id="testFixed" onclick="toggleTest('fixed')">
-              <span class="dot"></span>TEST
-            </button>
-            <div class="beat-indicator" id="beatFixed"></div>
-          </div>
-        </div>
-
-        <!-- RAMP BPM -->
-        <div id="rampSection">
-          <div class="bpm-blocks-grid">
-            <div class="bpm-block">
-              <div class="bpm-block-label">Start BPM</div>
-              <div class="bpm-row">
-                <button class="bpm-arrow" onclick="changeBpm('start',-10)">−10</button>
-                <button class="bpm-arrow" onclick="changeBpm('start',-1)">−</button>
-                <input type="number" class="num-input" id="bpmStart" value="60" min="20" max="300" oninput="updateRampPreview();updateSummary()">
-                <button class="bpm-arrow" onclick="changeBpm('start',+1)">+</button>
-                <button class="bpm-arrow" onclick="changeBpm('start',+10)">+10</button>
-              </div>
-              <div class="bpm-block-footer">
-                <span class="num-input-unit">BPM</span>
-                <button class="test-btn" id="testStart" onclick="toggleTest('start')">
-                  <span class="dot"></span>TEST
-                </button>
-                <div class="beat-indicator" id="beatStart"></div>
-              </div>
-            </div>
-
-            <div class="bpm-block">
-              <div class="bpm-block-label">End BPM</div>
-              <div class="bpm-row">
-                <button class="bpm-arrow" onclick="changeBpm('end',-10)">−10</button>
-                <button class="bpm-arrow" onclick="changeBpm('end',-1)">−</button>
-                <input type="number" class="num-input" id="bpmEnd" value="120" min="20" max="300" oninput="updateRampPreview();updateSummary()">
-                <button class="bpm-arrow" onclick="changeBpm('end',+1)">+</button>
-                <button class="bpm-arrow" onclick="changeBpm('end',+10)">+10</button>
-              </div>
-              <div class="bpm-block-footer">
-                <span class="num-input-unit">BPM</span>
-                <button class="test-btn" id="testEnd" onclick="toggleTest('end')">
-                  <span class="dot"></span>TEST
-                </button>
-                <div class="beat-indicator" id="beatEnd"></div>
-              </div>
+            <div class="bpm-block-footer">
+              <span class="num-input-unit">BPM</span>
+              <button class="test-btn" id="testStart" onclick="toggleTest('start')"><span class="dot"></span>TEST</button>
+              <div class="beat-dot" id="beatStart"></div>
             </div>
           </div>
-
-          <div class="ramp-preview" id="rampPreview">
-            <div class="ramp-preview-label">Tempo curve preview</div>
-            <svg class="ramp-svg-wrap" id="rampSvg" viewBox="0 0 300 48" preserveAspectRatio="none"></svg>
-            <div class="ramp-info">
-              <span>Start: <strong id="rampStartLabel">60</strong> BPM</span>
-              <span id="rampBeatsLabel" style="color:var(--muted);">— beats total</span>
-              <span>End: <strong id="rampEndLabel">120</strong> BPM</span>
+          <div class="bpm-block">
+            <div class="bpm-block-label">End BPM</div>
+            <div class="bpm-row">
+              <button class="bpm-arrow" onclick="changeBpm('end',-10)">−10</button>
+              <button class="bpm-arrow" onclick="changeBpm('end',-1)">−</button>
+              <input type="number" class="num-input" id="bpmEnd" value="120" min="20" max="300" oninput="updateRampPreview()">
+              <button class="bpm-arrow" onclick="changeBpm('end',+1)">+</button>
+              <button class="bpm-arrow" onclick="changeBpm('end',+10)">+10</button>
+            </div>
+            <div class="bpm-block-footer">
+              <span class="num-input-unit">BPM</span>
+              <button class="test-btn" id="testEnd" onclick="toggleTest('end')"><span class="dot"></span>TEST</button>
+              <div class="beat-dot" id="beatEnd"></div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- 03 · AUDIO MIX -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-label">Audio Mix</span>
-        <span class="section-num">03</span>
-      </div>
-      <div class="section-body">
-        <div class="control-row">
-          <span class="control-label">Original Audio</span>
-          <div class="slider-wrap">
-            <input type="range" id="origVol" min="0" max="100" value="50" oninput="updateSlider(this,'origVolVal')">
-            <span class="slider-val" id="origVolVal">50%</span>
-          </div>
-        </div>
-        <div class="control-row">
-          <span class="control-label">Metronome</span>
-          <div class="slider-wrap">
-            <input type="range" id="metroVol" min="0" max="100" value="80" oninput="updateSlider(this,'metroVolVal')">
-            <span class="slider-val" id="metroVolVal">80%</span>
-          </div>
-          <button class="test-btn" id="testMetroVol" onclick="toggleTestVol()">
-            <span class="dot"></span>TEST
-          </button>
-        </div>
-        <div class="divider" style="margin:8px 0 14px;"></div>
-        <div class="control-row">
-          <span class="control-label">Click Pitch</span>
-          <div class="toggle-group">
-            <button id="pitchLow" class="active" onclick="setPitch('low')">LOW</button>
-            <button id="pitchMid" onclick="setPitch('mid')">MID</button>
-            <button id="pitchHigh" onclick="setPitch('high')">HIGH</button>
-          </div>
-        </div>
-        <div class="control-row" style="margin-top:12px;">
-          <span class="control-label">Click Type</span>
-          <div class="toggle-group">
-            <button id="clickWood" class="active" onclick="setClickType('wood')">WOOD</button>
-            <button id="clickSine" onclick="setClickType('sine')">SINE</button>
-            <button id="clickNoise" onclick="setClickType('noise')">NOISE</button>
+        <div class="ramp-preview">
+          <div class="ramp-preview-label">Tempo curve</div>
+          <svg class="ramp-svg-wrap" id="rampSvg" viewBox="0 0 300 44" preserveAspectRatio="none"></svg>
+          <div class="ramp-info">
+            <span>Start: <strong id="rampStartLabel">60</strong> BPM</span>
+            <span id="rampBeatsLabel">— beats</span>
+            <span>End: <strong id="rampEndLabel">120</strong> BPM</span>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-  </div><!-- /left-panel -->
+  <div class="note">Generates a metronome-only MP3 matching your chosen duration. Everything runs in your browser — no uploads.</div>
 
-  <!-- RIGHT PANEL -->
-  <div class="right-panel">
-    <div class="right-panel-header">
-      <span class="section-label">Render &amp; Export</span>
+  <div class="status" id="statusMsg">Configure duration and BPM to begin</div>
+
+  <button id="processBtn" disabled onclick="startProcessing()">
+    <span>⚡ GENERATE MP3</span>
+  </button>
+
+  <div class="render-section" id="renderSection">
+    <div class="steps-row">
+      <div class="step-item" id="step1"><div class="step-pill"></div><div class="step-txt">Synth</div></div>
+      <div class="step-item" id="step2"><div class="step-pill"></div><div class="step-txt">Encode</div></div>
+      <div class="step-item" id="step3"><div class="step-pill"></div><div class="step-txt">Export</div></div>
     </div>
-
-    <div class="note">
-      Processing happens entirely in your browser. No files are uploaded to any server. Large videos may take several minutes.
+    <div class="progress-header">
+      <span class="progress-step" id="progressLabel">Initializing…</span>
+      <span class="progress-pct" id="progressPct">0%</span>
     </div>
-
-    <div class="status" id="statusMsg">Load a video to begin</div>
-
-    <button id="processBtn" disabled onclick="startProcessing()">
-      <span>⚡ PROCESS VIDEO</span>
-    </button>
-
-    <!-- PROGRESS -->
-    <div class="render-section" id="renderSection">
-      <div class="steps-row">
-        <div class="step-item" id="step1"><div class="step-pill-bar"></div><div class="step-label-txt">Read</div></div>
-        <div class="step-item" id="step2"><div class="step-pill-bar"></div><div class="step-label-txt">Decode</div></div>
-        <div class="step-item" id="step3"><div class="step-pill-bar"></div><div class="step-label-txt">Synth</div></div>
-        <div class="step-item" id="step4"><div class="step-pill-bar"></div><div class="step-label-txt">Mix</div></div>
-        <div class="step-item" id="step5"><div class="step-pill-bar"></div><div class="step-label-txt">Export</div></div>
-      </div>
-      <div class="progress-header">
-        <span class="progress-step" id="progressLabel">Initializing...</span>
-        <span class="progress-pct" id="progressPct">0%</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
-      <div class="progress-footer">
-        <div class="progress-sub" id="progressSub"></div>
-        <div class="elapsed-timer" id="elapsedTimer"></div>
-      </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-footer">
+      <span id="progressSub"></span>
+      <span id="elapsedTimer"></span>
     </div>
+  </div>
 
-    <a id="downloadBtn" class="download-btn" download="beatsync_output.mp4">⬇ DOWNLOAD MP4</a>
+  <a id="downloadBtn" class="download-btn" download="metronome.mp3">⬇ DOWNLOAD MP3</a>
 
-    <div class="divider"></div>
-
-    <div style="font-size:0.62rem;color:var(--muted);line-height:2;">
-      <div style="letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-size:0.6rem;">Current Settings</div>
-      <div>Mode: <span id="sumMode" style="color:var(--text);">Fixed</span></div>
-      <div>BPM: <span id="sumBpm" style="color:var(--text);">60</span></div>
-      <div>Original audio: <span id="sumOrig" style="color:var(--text);">50%</span></div>
-      <div>Metronome: <span id="sumMetro" style="color:var(--text);">80%</span></div>
-      <div>Pitch: <span id="sumPitch" style="color:var(--text);">Low</span></div>
-      <div>Click type: <span id="sumClick" style="color:var(--text);">Wood</span></div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div style="font-size:0.6rem;color:var(--muted);line-height:1.8;">
-      <div style="letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">How it works</div>
-      1. The original video audio is decoded via Web Audio API<br>
-      2. A metronome click track is synthesized in PCM<br>
-      3. Both tracks are mixed at your chosen levels → written as WAV<br>
-      4. FFmpeg.wasm muxes: original video frames (bit-perfect copy) + new audio → MP4<br>
-      <br>
-      <span style="color:var(--accent2);">Note:</span> FFmpeg.wasm (~30 MB) loads on first use. Video quality is lossless — only audio is re-encoded to AAC.
-    </div>
-  </div><!-- /right-panel -->
 </div>
 
-<!--
-  FFmpeg.wasm — @ffmpeg/ffmpeg@0.11.6 (UMD, main-thread) +
-  @ffmpeg/core-st@0.11.1 (single-threaded, NO SharedArrayBuffer, NO Worker).
-  The -st core is compiled without pthreads, so it works on any host including
-  GitHub Pages with zero special headers.
--->
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 <script>
-// ─── APP STATE ────────────────────────────────────────────────────────────────
-const state = { mode: 'fixed', pitch: 'low', clickType: 'wood', videoFile: null, videoDuration: 0 };
-let audioCtx   = null;
+const state = { mode: 'fixed', source: 'video', videoDuration: 0 };
+let audioCtx = null;
 let testTimers = {};
 
 function getAudioCtx() {
-  if (!audioCtx || audioCtx.state === 'closed') audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioCtx || audioCtx.state === 'closed')
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
 
-// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+function getActiveDuration() {
+  if (state.source === 'video') return state.videoDuration;
+  const h = parseInt(document.getElementById('durH').value) || 0;
+  const m = parseInt(document.getElementById('durM').value) || 0;
+  const s = parseInt(document.getElementById('durS').value) || 0;
+  return h * 3600 + m * 60 + s;
+}
+
+// ── SOURCE TOGGLE ─────────────────────────────────────────────────────────────
+window.setSource = function(src) {
+  state.source = src;
+  document.getElementById('srcVideo').classList.toggle('active', src === 'video');
+  document.getElementById('srcManual').classList.toggle('active', src === 'manual');
+  document.getElementById('videoSource').style.display  = src === 'video'  ? 'block' : 'none';
+  document.getElementById('manualSource').classList.toggle('visible', src === 'manual');
+  if (src === 'manual') {
+    onManualChange();
+  } else {
+    if (!state.videoDuration) {
+      setStatus('Load a video to begin', '');
+      document.getElementById('processBtn').disabled = true;
+    }
+  }
+};
+
+window.onManualChange = function() {
+  const h = parseInt(document.getElementById('durH').value) || 0;
+  const m = parseInt(document.getElementById('durM').value) || 0;
+  const s = parseInt(document.getElementById('durS').value) || 0;
+  // clamp
+  if (m > 59) { document.getElementById('durM').value = 59; }
+  if (s > 59) { document.getElementById('durS').value = 59; }
+  const total = h * 3600 + m * 60 + s;
+  document.getElementById('durTotalLabel').textContent = formatTime(total);
+  document.getElementById('durTotalSec').textContent   = total + 's';
+  if (total > 0) {
+    document.getElementById('processBtn').disabled = false;
+    setStatus('Ready — configure BPM and generate', '');
+  } else {
+    document.getElementById('processBtn').disabled = true;
+    setStatus('Enter a duration greater than 0', '');
+  }
+  if (state.mode === 'ramp') updateRampPreview();
+};
+
+// ── MODE ──────────────────────────────────────────────────────────────────────
 window.setMode = function(m) {
   state.mode = m;
   document.getElementById('modeFixed').classList.toggle('active', m === 'fixed');
-  document.getElementById('modeRamp').classList.toggle('active', m === 'ramp');
+  document.getElementById('modeRamp').classList.toggle('active',  m === 'ramp');
   document.getElementById('fixedSection').style.display = m === 'fixed' ? 'block' : 'none';
   document.getElementById('rampSection').style.display  = m === 'ramp'  ? 'block' : 'none';
   if (m === 'ramp') updateRampPreview();
-  updateSummary();
-};
-
-window.setPitch = function(p) {
-  state.pitch = p;
-  ['Low','Mid','High'].forEach(x => document.getElementById('pitch'+x).classList.remove('active'));
-  document.getElementById('pitch'+p[0].toUpperCase()+p.slice(1)).classList.add('active');
-  updateSummary();
-};
-
-window.setClickType = function(t) {
-  state.clickType = t;
-  ['Wood','Sine','Noise'].forEach(x => document.getElementById('click'+x).classList.remove('active'));
-  document.getElementById('click'+t[0].toUpperCase()+t.slice(1)).classList.add('active');
-  updateSummary();
 };
 
 window.changeBpm = function(which, delta) {
-  const ids = { fixed: 'bpmFixed', start: 'bpmStart', end: 'bpmEnd' };
+  const ids = { fixed:'bpmFixed', start:'bpmStart', end:'bpmEnd' };
   const el  = document.getElementById(ids[which]);
-  let val   = parseInt(el.value) + delta;
-  val = Math.max(20, Math.min(300, val));
-  el.value = val;
+  el.value  = Math.max(20, Math.min(300, parseInt(el.value) + delta));
   if (which === 'start' || which === 'end') updateRampPreview();
-  updateSummary();
 };
 
-window.updateSlider = function(el, valId) {
-  document.getElementById(valId).textContent = el.value + '%';
-  updateSummary();
-};
-
+// ── RAMP CURVE ────────────────────────────────────────────────────────────────
 function updateRampPreview() {
-  const startBpm = parseInt(document.getElementById('bpmStart').value) || 60;
-  const endBpm   = parseInt(document.getElementById('bpmEnd').value)   || 120;
-  const duration = state.videoDuration || 60;
-
-  document.getElementById('rampStartLabel').textContent = startBpm;
-  document.getElementById('rampEndLabel').textContent   = endBpm;
-
-  const avgBpm = (startBpm + endBpm) / 2;
-  const beats  = Math.round(avgBpm * duration / 60);
-  document.getElementById('rampBeatsLabel').textContent = state.videoDuration ? `~${beats} beats total` : '— beats total';
-
+  const s = parseInt(document.getElementById('bpmStart').value) || 60;
+  const e = parseInt(document.getElementById('bpmEnd').value)   || 120;
+  const d = getActiveDuration() || 60;
+  document.getElementById('rampStartLabel').textContent = s;
+  document.getElementById('rampEndLabel').textContent   = e;
+  const beats = Math.round(((s+e)/2) * d / 60);
+  document.getElementById('rampBeatsLabel').textContent = getActiveDuration() ? `~${beats} beats` : '— beats';
   const svg = document.getElementById('rampSvg');
-  const W = 300, H = 48, PAD = 6;
-  const minB = Math.min(startBpm, endBpm), maxB = Math.max(startBpm, endBpm);
-  const range = maxB - minB || 1;
-  const pts   = [];
-  for (let i = 0; i <= 60; i++) {
-    const t   = i / 60;
-    const bpm = startBpm + (endBpm - startBpm) * t;
-    const x   = PAD + t * (W - PAD * 2);
-    const y   = H - PAD - ((bpm - minB) / range) * (H - PAD * 2);
-    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  const W=300,H=44,P=5;
+  const minB=Math.min(s,e), maxB=Math.max(s,e), range=maxB-minB||1;
+  const pts=[];
+  for(let i=0;i<=60;i++){
+    const t=i/60, bpm=s+(e-s)*t;
+    pts.push(`${(P+t*(W-P*2)).toFixed(1)},${(H-P-((bpm-minB)/range)*(H-P*2)).toFixed(1)}`);
   }
-  const firstX = PAD, lastX = W - PAD;
-  const fillPath = `M${firstX},${H} ` + pts.map((p,i)=>(i===0?'L':'')+p).join(' ') + ` L${lastX},${H} Z`;
-  svg.innerHTML = `
-    <defs><linearGradient id="rampGrad" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#c8ff00" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#c8ff00" stop-opacity="0.35"/>
-    </linearGradient></defs>
-    <path d="${fillPath}" fill="url(#rampGrad)"/>
-    <polyline points="${pts.join(' ')}" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${PAD}"   cy="${H - PAD - ((startBpm - minB) / range) * (H - PAD * 2)}" r="3" fill="#c8ff00"/>
-    <circle cx="${W-PAD}" cy="${H - PAD - ((endBpm   - minB) / range) * (H - PAD * 2)}" r="3" fill="#d9ff1a"/>
-  `;
+  const fill=`M${P},${H} `+pts.map((p,i)=>(i===0?'L':'')+p).join(' ')+` L${W-P},${H} Z`;
+  svg.innerHTML=`<defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#c8ff00" stop-opacity="0.12"/>
+    <stop offset="100%" stop-color="#c8ff00" stop-opacity="0.3"/>
+  </linearGradient></defs>
+  <path d="${fill}" fill="url(#rg)"/>
+  <polyline points="${pts.join(' ')}" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="${P}" cy="${H-P-((s-minB)/range)*(H-P*2)}" r="3" fill="#c8ff00"/>
+  <circle cx="${W-P}" cy="${H-P-((e-minB)/range)*(H-P*2)}" r="3" fill="#d9ff1a"/>`;
 }
 
-function updateSummary() {
-  document.getElementById('sumMode').textContent  = state.mode === 'fixed' ? 'Fixed' : 'Ramp';
-  document.getElementById('sumBpm').textContent   = state.mode === 'fixed'
-    ? document.getElementById('bpmFixed').value + ' BPM'
-    : document.getElementById('bpmStart').value + ' → ' + document.getElementById('bpmEnd').value + ' BPM';
-  document.getElementById('sumOrig').textContent  = document.getElementById('origVol').value + '%';
-  document.getElementById('sumMetro').textContent = document.getElementById('metroVol').value + '%';
-  document.getElementById('sumPitch').textContent = state.pitch[0].toUpperCase() + state.pitch.slice(1);
-  document.getElementById('sumClick').textContent = state.clickType[0].toUpperCase() + state.clickType.slice(1);
-}
-
-// ─── PROGRESS ────────────────────────────────────────────────────────────────
-const STEPS = ['step1','step2','step3','step4','step5'];
-
-function setProgress(pct, label, sub, stepIdx) {
-  const fill = document.getElementById('progressFill');
-  fill.classList.remove('indeterminate');
-  fill.style.width = pct + '%';
-  document.getElementById('progressPct').textContent   = Math.round(pct) + '%';
-  document.getElementById('progressLabel').textContent = label;
-  document.getElementById('progressSub').textContent   = sub || '';
-  if (stepIdx !== undefined) {
-    STEPS.forEach((id, i) => {
-      const el = document.getElementById(id);
-      if      (i < stepIdx)  el.className = 'step-item done';
-      else if (i === stepIdx) el.className = 'step-item active';
-      else                    el.className = 'step-item';
-    });
-  }
-}
-
-// ─── CLICK SOUND ─────────────────────────────────────────────────────────────
-function getPitchFreq() { return { low: 180, mid: 440, high: 1000 }[state.pitch]; }
-
-function playClick(ctx, when, gainVal) {
-  const freq     = getPitchFreq();
-  const gainNode = ctx.createGain();
-  gainNode.connect(ctx.destination);
-  if (state.clickType === 'wood') {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq * 2, when);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, when + 0.08);
-    gainNode.gain.setValueAtTime(gainVal, when);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
-    osc.connect(gainNode); osc.start(when); osc.stop(when + 0.13);
-    const osc2 = ctx.createOscillator(); osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(freq * 0.7, when);
-    const g2 = ctx.createGain();
-    g2.gain.setValueAtTime(gainVal * 0.4, when);
-    g2.gain.exponentialRampToValueAtTime(0.001, when + 0.1);
-    osc2.connect(g2); g2.connect(ctx.destination); osc2.start(when); osc2.stop(when + 0.11);
-  } else if (state.clickType === 'sine') {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine'; osc.frequency.setValueAtTime(freq, when);
-    gainNode.gain.setValueAtTime(gainVal, when);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, when + 0.15);
-    osc.connect(gainNode); osc.start(when); osc.stop(when + 0.16);
-  } else {
-    const bufLen = Math.ceil(ctx.sampleRate * 0.05);
-    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-    const data   = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-    const src    = ctx.createBufferSource(); src.buffer = buf;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass'; filter.frequency.value = freq; filter.Q.value = 2;
-    gainNode.gain.setValueAtTime(gainVal, when);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
-    src.connect(filter); filter.connect(gainNode); src.start(when); src.stop(when + 0.09);
-  }
-}
-
-// ─── TEST PLAYBACK ────────────────────────────────────────────────────────────
-window.toggleTest = function(which) {
-  const btnId = 'test' + which[0].toUpperCase() + which.slice(1);
-  const btn   = document.getElementById(btnId);
-  if (testTimers[which]) { stopTest(which); return; }
-  btn.classList.add('playing');
-  const ctx    = getAudioCtx();
-  const bpmIds = { fixed: 'bpmFixed', start: 'bpmStart', end: 'bpmEnd' };
-  const bpm    = parseInt(document.getElementById(bpmIds[which]).value);
-  const interval = 60 / bpm;
-  let nextBeat   = ctx.currentTime + 0.05;
-  const vol      = parseInt(document.getElementById('metroVol').value) / 100;
-  const beatId   = 'beat' + which[0].toUpperCase() + which.slice(1);
-  function schedule() {
-    while (nextBeat < ctx.currentTime + 0.2) {
-      playClick(ctx, nextBeat, vol);
-      const delay  = (nextBeat - ctx.currentTime) * 1000;
-      setTimeout(() => {
-        const beatEl = document.getElementById(beatId);
-        if (beatEl) { beatEl.classList.add('flash'); setTimeout(() => beatEl.classList.remove('flash'), 80); }
-      }, Math.max(0, delay));
-      nextBeat += interval;
-    }
-    testTimers[which] = requestAnimationFrame(schedule);
-  }
-  schedule();
-};
-
-window.toggleTestVol = function() {
-  const which = 'metroVol';
-  const btn   = document.getElementById('testMetroVol');
-  if (testTimers[which]) { stopTest(which); return; }
-  btn.classList.add('playing');
-  const ctx    = getAudioCtx();
-  const bpm    = state.mode === 'fixed'
-    ? parseInt(document.getElementById('bpmFixed').value)
-    : parseInt(document.getElementById('bpmStart').value);
-  const interval = 60 / bpm;
-  let nextBeat   = ctx.currentTime + 0.05;
-  const vol      = parseInt(document.getElementById('metroVol').value) / 100;
-  function schedule() {
-    while (nextBeat < ctx.currentTime + 0.2) { playClick(ctx, nextBeat, vol); nextBeat += interval; }
-    testTimers[which] = requestAnimationFrame(schedule);
-  }
-  schedule();
-};
-
-function stopTest(which) {
-  if (testTimers[which]) { cancelAnimationFrame(testTimers[which]); delete testTimers[which]; }
-  const btnId = 'test' + which[0].toUpperCase() + which.slice(1);
-  const btn   = document.getElementById(btnId);
-  if (btn) btn.classList.remove('playing');
-}
-
-['bpmFixed','bpmStart','bpmEnd'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => {
-    Object.keys(testTimers).forEach(k => stopTest(k));
-    updateSummary();
-  });
-});
-
-// ─── VIDEO FILE ───────────────────────────────────────────────────────────────
+// ── VIDEO INPUT ───────────────────────────────────────────────────────────────
 const dropzone  = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('drag-over'));
 dropzone.addEventListener('drop', e => {
   e.preventDefault(); dropzone.classList.remove('drag-over');
   const f = e.dataTransfer.files[0];
@@ -651,184 +439,66 @@ dropzone.addEventListener('drop', e => {
 fileInput.addEventListener('change', e => { if (e.target.files[0]) loadVideo(e.target.files[0]); });
 
 function loadVideo(file) {
-  state.videoFile = file;
-  const url    = URL.createObjectURL(file);
-  const player = document.getElementById('videoPlayer');
-  player.src   = url;
-  player.onloadedmetadata = () => {
-    state.videoDuration = player.duration;
-    document.getElementById('vDuration').textContent = formatTime(player.duration);
+  const url = URL.createObjectURL(file);
+  const vid = document.createElement('video');
+  vid.src   = url;
+  vid.onloadedmetadata = () => {
+    state.videoDuration = vid.duration;
+    document.getElementById('vDuration').textContent = formatTime(vid.duration);
+    document.getElementById('vName').textContent = file.name.length > 34 ? file.name.slice(0,32)+'…' : file.name;
+    document.getElementById('videoInfo').classList.add('visible');
+    document.getElementById('processBtn').disabled = false;
+    setStatus('Ready — configure BPM and generate', '');
     if (state.mode === 'ramp') updateRampPreview();
+    URL.revokeObjectURL(url);
   };
-  player.onseeked = () => {
-    const canvas = document.getElementById('firstFrame');
-    const maxW = 480, maxH = 160;
-    const ratio  = Math.min(maxW / player.videoWidth, maxH / player.videoHeight);
-    canvas.width  = Math.round(player.videoWidth  * ratio);
-    canvas.height = Math.round(player.videoHeight * ratio);
-    canvas.getContext('2d').drawImage(player, 0, 0, canvas.width, canvas.height);
-  };
-  player.onloadeddata = () => { player.currentTime = 0.001; };
-  document.getElementById('vSize').textContent = formatBytes(file.size);
-  document.getElementById('vType').textContent = file.type.split('/')[1].toUpperCase();
-  document.getElementById('videoContainer').style.display = 'block';
-  document.getElementById('processBtn').disabled = false;
-  setStatus('Video loaded — configure settings and process', '');
-  updateSummary();
+  vid.onerror = () => setStatus('Could not read video duration', 'error');
 }
 
-function formatTime(s) { const m = Math.floor(s/60); return `${m}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
-function formatBytes(b) { if (b>1e9) return (b/1e9).toFixed(1)+' GB'; if (b>1e6) return (b/1e6).toFixed(1)+' MB'; return (b/1e3).toFixed(1)+' KB'; }
-function setStatus(msg, type) { const el = document.getElementById('statusMsg'); el.textContent = msg; el.className = 'status '+(type||''); }
+function formatTime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+function setStatus(msg, type) { const el=document.getElementById('statusMsg'); el.textContent=msg; el.className='status '+(type||''); }
 
-// ─── PROCESSING ───────────────────────────────────────────────────────────────
-let _elapsedInterval = null;
-
-window.startProcessing = async function() {
-  Object.keys(testTimers).forEach(k => stopTest(k));
-  const btn = document.getElementById('processBtn');
-  btn.disabled = true;
-  document.getElementById('renderSection').style.display = 'block';
-  document.getElementById('downloadBtn').style.display   = 'none';
-  STEPS.forEach(id => { document.getElementById(id).className = 'step-item'; });
-
-  const startWall = Date.now();
-  const timerEl   = document.getElementById('elapsedTimer');
-  if (_elapsedInterval) clearInterval(_elapsedInterval);
-  timerEl.textContent = '0.0s';
-  _elapsedInterval = setInterval(() => {
-    timerEl.textContent = ((Date.now() - startWall) / 1000).toFixed(1) + 's';
-  }, 100);
-
-  try {
-    const origVolPct   = parseInt(document.getElementById('origVol').value)  / 100;
-    const metroVolPct  = parseInt(document.getElementById('metroVol').value) / 100;
-    const duration     = state.videoDuration;
-    const sampleRate   = 44100;
-    const totalSamples = Math.ceil(sampleRate * duration);
-
-    setProgress(5, 'Reading video file…', '', 0);
-    const arrayBuffer = await state.videoFile.arrayBuffer();
-
-    setProgress(15, 'Decoding audio track…', 'This may take a moment for long videos', 1);
-    const offlineCtx = new OfflineAudioContext(2, totalSamples, sampleRate);
-    let decodedAudio = null;
-    try { decodedAudio = await offlineCtx.decodeAudioData(arrayBuffer.slice(0)); }
-    catch(e) { console.warn('No audio track or decode failed:', e); }
-
-    setProgress(35, 'Synthesizing metronome…', 'Computing click track…', 2);
-    await new Promise(r => setTimeout(r, 16));
-    const metroBuf = synthesizeMetronome(sampleRate, duration);
-
-    setProgress(55, 'Mixing audio tracks…', '', 3);
-    await new Promise(r => setTimeout(r, 0));
-    const mixedBuffer = mixAudio(decodedAudio, metroBuf, origVolPct, metroVolPct, sampleRate, totalSamples);
-
-    setProgress(70, 'Muxing with FFmpeg…', 'Loading FFmpeg.wasm…', 4);
-    const result = await muxWithFFmpeg(arrayBuffer, mixedBuffer, sampleRate);
-
-    clearInterval(_elapsedInterval);
-    timerEl.textContent = ((Date.now() - startWall) / 1000).toFixed(1) + 's total';
-    setProgress(100, 'Done!', '', 5);
-    setStatus('Processing complete!', 'ok');
-    const dlBtn     = document.getElementById('downloadBtn');
-    dlBtn.href      = result;
-    dlBtn.style.display = 'block';
-    dlBtn.download  = 'beatsync_' + (state.videoFile?.name?.replace(/\.[^.]+$/, '') || 'output') + '.mp4';
-  } catch(err) {
-    clearInterval(_elapsedInterval);
-    console.error(err);
-    setStatus('Error: ' + err.message, 'error');
-    setProgress(0, 'Failed — see console', '');
-    STEPS.forEach(id => { document.getElementById(id).className = 'step-item'; });
+// ── PROGRESS ──────────────────────────────────────────────────────────────────
+const STEPS = ['step1','step2','step3'];
+function setProgress(pct, label, sub, stepIdx) {
+  document.getElementById('progressFill').style.width   = pct + '%';
+  document.getElementById('progressPct').textContent    = Math.round(pct) + '%';
+  document.getElementById('progressLabel').textContent  = label;
+  document.getElementById('progressSub').textContent    = sub || '';
+  if (stepIdx !== undefined) {
+    STEPS.forEach((id,i) => {
+      const el = document.getElementById(id);
+      el.className = i < stepIdx ? 'step-item done' : i === stepIdx ? 'step-item active' : 'step-item';
+    });
   }
-  btn.disabled = false;
-};
-
-// ─── METRONOME SYNTHESIS ─────────────────────────────────────────────────────
-function synthesizeMetronome(sampleRate, duration) {
-  const beats        = computeBeatTimes(duration);
-  const totalSamples = Math.ceil(sampleRate * duration);
-  const data         = new Float32Array(totalSamples);
-  const freq         = getPitchFreq();
-  const clickType    = state.clickType;
-
-  for (const beatTime of beats) {
-    if (beatTime + 0.2 > duration) continue;
-    const startIdx = Math.round(beatTime * sampleRate);
-    if (clickType === 'wood') {
-      const f0 = freq * 2, f1 = freq * 0.5;
-      const k  = Math.log(f1 / f0) / 0.08;
-      const len1 = Math.min(Math.ceil(0.13 * sampleRate), totalSamples - startIdx);
-      const gainDecay1 = -Math.log(0.001) / 0.12;
-      let phase1 = 0;
-      for (let i = 0; i < len1; i++) {
-        const t = i / sampleRate;
-        phase1 += 2 * Math.PI * (f0 * Math.exp(k * Math.min(t, 0.08))) / sampleRate;
-        data[startIdx + i] += Math.sin(phase1) * Math.exp(-gainDecay1 * t);
-      }
-      const len2 = Math.min(Math.ceil(0.11 * sampleRate), totalSamples - startIdx);
-      const gainDecay2 = -Math.log(0.001) / 0.10;
-      for (let i = 0; i < len2; i++) {
-        const t  = i / sampleRate;
-        const ph = (freq * 0.7 * t) % 1;
-        data[startIdx + i] += (ph < 0.5 ? 4*ph - 1 : 3 - 4*ph) * 0.4 * Math.exp(-gainDecay2 * t);
-      }
-    } else if (clickType === 'sine') {
-      const len   = Math.min(Math.ceil(0.16 * sampleRate), totalSamples - startIdx);
-      const decay = -Math.log(0.001) / 0.15;
-      for (let i = 0; i < len; i++) {
-        const t = i / sampleRate;
-        data[startIdx + i] += Math.sin(2 * Math.PI * freq * t) * Math.exp(-decay * t);
-      }
-    } else {
-      const len   = Math.min(Math.ceil(0.09 * sampleRate), totalSamples - startIdx);
-      const decay = -Math.log(0.001) / 0.08;
-      const omega = 2 * Math.PI * freq / sampleRate;
-      const Q     = 2;
-      const cosW  = Math.cos(omega), sinW = Math.sin(omega);
-      const alpha = sinW / (2 * Q);
-      const b0 = alpha, b2 = -alpha;
-      const a0 = 1 + alpha, a1 = -2 * cosW, a2 = 1 - alpha;
-      const n   = 1 / a0;
-      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-      for (let i = 0; i < len; i++) {
-        const t = i / sampleRate;
-        const x = Math.random() * 2 - 1;
-        const y = (b0*x - b2*x2 - a1*y1 - a2*y2) * n;
-        x2 = x1; x1 = x; y2 = y1; y1 = y;
-        data[startIdx + i] += y * Math.exp(-decay * t);
-      }
-    }
-  }
-
-  let audioBuf;
-  try { audioBuf = new AudioBuffer({ numberOfChannels: 1, length: totalSamples, sampleRate }); }
-  catch(e) { audioBuf = new OfflineAudioContext(1, 2, sampleRate).createBuffer(1, totalSamples, sampleRate); }
-  audioBuf.getChannelData(0).set(data);
-  return audioBuf;
 }
 
+// ── BEAT TIMES ────────────────────────────────────────────────────────────────
 function computeBeatTimes(duration) {
   const beats    = [];
   const bpmFixed = parseInt(document.getElementById('bpmFixed').value);
   const bpmStart = parseInt(document.getElementById('bpmStart').value);
   const bpmEnd   = parseInt(document.getElementById('bpmEnd').value);
-
   if (state.mode === 'fixed') {
-    const interval = 60 / bpmFixed;
-    for (let t = 0; t < duration; t += interval) beats.push(t);
+    const ivl = 60 / bpmFixed;
+    for (let t = 0; t < duration; t += ivl) beats.push(t);
   } else {
     const diff = bpmEnd - bpmStart;
     if (Math.abs(diff) < 0.01) {
-      const interval = 60 / bpmStart;
-      for (let t = 0; t < duration; t += interval) beats.push(t);
+      const ivl = 60 / bpmStart;
+      for (let t = 0; t < duration; t += ivl) beats.push(t);
     } else {
       const A = diff / (2 * duration), B = bpmStart;
       for (let n = 0; ; n++) {
-        const disc = B * B + 4 * A * 60 * n;
+        const disc = B*B + 4*A*60*n;
         if (disc < 0) break;
-        const t = (-B + Math.sqrt(disc)) / (2 * A);
+        const t = (-B + Math.sqrt(disc)) / (2*A);
         if (t >= duration) break;
         beats.push(t);
       }
@@ -837,128 +507,182 @@ function computeBeatTimes(duration) {
   return beats;
 }
 
-function mixAudio(origBuffer, metroBuffer, origGain, metroGain, sampleRate, totalSamples) {
-  const mixed  = new Float32Array(totalSamples * 2);
-  const metro0 = metroBuffer.getChannelData(0);
-  const origL  = origBuffer && origBuffer.numberOfChannels > 0 ? origBuffer.getChannelData(0) : null;
-  const origR  = origBuffer && origBuffer.numberOfChannels > 1 ? origBuffer.getChannelData(1) : origL;
-  const origLen = origL ? origL.length : 0;
-  for (let i = 0; i < totalSamples; i++) {
-    const oL = (origL && i < origLen) ? origL[i] * origGain : 0;
-    const oR = (origR && i < origLen) ? origR[i] * origGain : oL;
-    const m  = i < metro0.length ? metro0[i] * metroGain : 0;
-    mixed[i*2]     = oL + m;
-    mixed[i*2 + 1] = oR + m;
+// ── SYNTHESIS ─────────────────────────────────────────────────────────────────
+function synthesizeMetronomePCM(sampleRate, duration) {
+  const totalSamples = Math.ceil(sampleRate * duration);
+  const data         = new Float32Array(totalSamples);
+  const beats        = computeBeatTimes(duration);
+  const f0 = 1440, f1 = 480;
+  const clickDur = 0.12, decayK = -Math.log(0.001) / 0.10;
+  const logRatio = Math.log(f1 / f0) / 0.08;
+
+  for (const t of beats) {
+    const start = Math.round(t * sampleRate);
+    const len   = Math.min(Math.ceil(clickDur * sampleRate), totalSamples - start);
+    let phase   = 0;
+    for (let i = 0; i < len; i++) {
+      const ti = i / sampleRate;
+      const f  = f0 * Math.exp(logRatio * Math.min(ti, 0.08));
+      phase   += 2 * Math.PI * f / sampleRate;
+      data[start + i] += Math.sin(phase) * Math.exp(-decayK * ti);
+    }
   }
-  return { data: mixed, sampleRate, channels: 2, length: totalSamples };
+  let peak = 0;
+  for (let i = 0; i < data.length; i++) if (Math.abs(data[i]) > peak) peak = Math.abs(data[i]);
+  if (peak > 0) { const g = 0.9 / peak; for (let i = 0; i < data.length; i++) data[i] *= g; }
+  return data;
 }
 
-function encodeWav(interleavedF32, sampleRate, numChannels) {
-  const numSamples     = interleavedF32.length / numChannels;
-  const bytesPerSample = 2;
-  const dataSize       = numSamples * numChannels * bytesPerSample;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view   = new DataView(buffer);
-  const write  = (off, str) => { for (let i=0; i<str.length; i++) view.setUint8(off+i, str.charCodeAt(i)); };
-  write(0, 'RIFF'); view.setUint32(4, 36+dataSize, true); write(8, 'WAVE');
-  write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true); view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
-  view.setUint16(32, numChannels * bytesPerSample, true); view.setUint16(34, 16, true);
-  write(36, 'data'); view.setUint32(40, dataSize, true);
-  let offset = 44;
-  for (let i = 0; i < interleavedF32.length; i++) {
-    const s = Math.max(-1, Math.min(1, interleavedF32[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    offset += 2;
+function float32ToInt16(f32) {
+  const out = new Int16Array(f32.length);
+  for (let i = 0; i < f32.length; i++) {
+    const s = Math.max(-1, Math.min(1, f32[i]));
+    out[i]  = s < 0 ? s * 0x8000 : s * 0x7FFF;
   }
-  return buffer;
+  return out;
 }
 
-// ─── FFMPEG 0.11 + SINGLE-THREADED CORE (no SharedArrayBuffer, no Worker) ────
-//
-// @ffmpeg/core-st@0.11.1 is compiled without pthreads support.
-// It runs purely on the main thread and never touches SharedArrayBuffer,
-// so it works on any host — including GitHub Pages — with no special headers.
-//
-let _ffmpegInstance = null;
-let _ffmpegLoading  = null;
-
-async function loadFFmpegInstance() {
-  if (_ffmpegInstance) return _ffmpegInstance;
-  if (_ffmpegLoading)  return _ffmpegLoading;
-
-  _ffmpegLoading = (async () => {
-    const { createFFmpeg } = window.FFmpeg; // from the UMD <script> tag above
-
-    const ffmpeg = createFFmpeg({
-      // Single-threaded core: no pthreads, no SharedArrayBuffer, no Worker.
-      corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
-      log: false,
-      progress: ({ ratio }) => {
-        if (ratio >= 0 && ratio <= 1) {
-          setProgress(85 + Math.floor(ratio * 12), 'Muxing video + audio…',
-            `FFmpeg: ${Math.round(ratio * 100)}%`, 4);
-        }
-      },
-    });
-
-    await ffmpeg.load();
-    _ffmpegInstance = ffmpeg;
-    return ffmpeg;
-  })();
-
-  return _ffmpegLoading;
+// ── TEST PLAYBACK ─────────────────────────────────────────────────────────────
+function playClickNow(ctx, when) {
+  const gain = ctx.createGain();
+  gain.connect(ctx.destination);
+  const osc  = ctx.createOscillator();
+  osc.type   = 'sine';
+  osc.frequency.setValueAtTime(1440, when);
+  osc.frequency.exponentialRampToValueAtTime(480, when + 0.08);
+  gain.gain.setValueAtTime(0.8, when);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + 0.11);
+  osc.connect(gain);
+  osc.start(when); osc.stop(when + 0.12);
 }
 
-async function muxWithFFmpeg(videoArrayBuffer, mixedAudio, sampleRate) {
-  setProgress(72, 'Loading FFmpeg.wasm…', 'First run downloads ~10 MB…', 4);
-  const ffmpeg = await loadFFmpegInstance();
+window.toggleTest = function(which) {
+  const btnId = 'test' + which[0].toUpperCase() + which.slice(1);
+  const btn   = document.getElementById(btnId);
+  if (testTimers[which]) { stopTest(which); return; }
+  btn.classList.add('playing');
+  const ctx  = getAudioCtx();
+  const idMap = { fixed:'bpmFixed', start:'bpmStart', end:'bpmEnd' };
+  const bpm  = parseInt(document.getElementById(idMap[which]).value);
+  const ivl  = 60 / bpm;
+  let next   = ctx.currentTime + 0.05;
+  const beatId = 'beat' + which[0].toUpperCase() + which.slice(1);
+  function sched() {
+    while (next < ctx.currentTime + 0.25) {
+      playClickNow(ctx, next);
+      const delay = (next - ctx.currentTime) * 1000;
+      setTimeout(() => {
+        const el = document.getElementById(beatId);
+        if (el) { el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 80); }
+      }, Math.max(0, delay));
+      next += ivl;
+    }
+    testTimers[which] = requestAnimationFrame(sched);
+  }
+  sched();
+};
 
-  const { fetchFile } = window.FFmpeg;
-
-  const origExt = (state.videoFile.name.split('.').pop() || 'mp4').toLowerCase();
-  const inName  = `input.${origExt}`;
-
-  setProgress(78, 'Writing files to FFmpeg…', 'Transferring video + audio data…', 4);
-  await new Promise(r => setTimeout(r, 0));
-
-  // 0.11 API uses ffmpeg.FS() for virtual filesystem access
-  ffmpeg.FS('writeFile', inName,      await fetchFile(new Blob([videoArrayBuffer])));
-  const wavBuffer = encodeWav(mixedAudio.data, sampleRate, mixedAudio.channels);
-  ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(new Blob([wavBuffer])));
-
-  setProgress(85, 'Muxing video + audio…', 'Encoding audio track, copying video…', 4);
-  await new Promise(r => setTimeout(r, 0));
-
-  // 0.11 API uses ffmpeg.run() with spread args
-  await ffmpeg.run(
-    '-i', inName,
-    '-i', 'audio.wav',
-    '-map', '0:v:0',
-    '-map', '1:a:0',
-    '-c:v', 'copy',
-    '-c:a', 'aac',
-    '-b:a', '192k',
-    '-movflags', '+faststart',
-    '-y',
-    'output.mp4'
-  );
-
-  setProgress(98, 'Finalising MP4…', 'Reading output…', 4);
-  const data = ffmpeg.FS('readFile', 'output.mp4');
-
-  // Clean up virtual FS
-  try { ffmpeg.FS('unlink', inName); }       catch(_) {}
-  try { ffmpeg.FS('unlink', 'audio.wav'); }  catch(_) {}
-  try { ffmpeg.FS('unlink', 'output.mp4'); } catch(_) {}
-
-  return URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+function stopTest(which) {
+  if (testTimers[which]) { cancelAnimationFrame(testTimers[which]); delete testTimers[which]; }
+  const btn = document.getElementById('test' + which[0].toUpperCase() + which.slice(1));
+  if (btn) btn.classList.remove('playing');
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-updateSummary();
+['bpmFixed','bpmStart','bpmEnd'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () =>
+    Object.keys(testTimers).forEach(k => stopTest(k)))
+);
+
+// ── MAIN ──────────────────────────────────────────────────────────────────────
+let _elapsed = null;
+
+window.startProcessing = async function() {
+  Object.keys(testTimers).forEach(k => stopTest(k));
+  const duration = getActiveDuration();
+  if (!duration) { setStatus('Duration is 0 — please set a valid duration', 'error'); return; }
+
+  const btn = document.getElementById('processBtn');
+  btn.disabled = true;
+  document.getElementById('renderSection').style.display = 'block';
+  document.getElementById('downloadBtn').style.display   = 'none';
+  STEPS.forEach(id => { document.getElementById(id).className = 'step-item'; });
+
+  const t0    = Date.now();
+  const timer = document.getElementById('elapsedTimer');
+  if (_elapsed) clearInterval(_elapsed);
+  _elapsed = setInterval(() => { timer.textContent = ((Date.now()-t0)/1000).toFixed(1)+'s'; }, 100);
+
+  try {
+    if (typeof lamejs === 'undefined') throw new Error('lamejs encoder did not load — check your connection and reload');
+
+    const sampleRate = 44100;
+
+    setProgress(5, 'Synthesizing clicks…', `${computeBeatTimes(duration).length} beats over ${formatTime(duration)}`, 0);
+    await tick();
+    const pcm   = synthesizeMetronomePCM(sampleRate, duration);
+    const int16 = float32ToInt16(pcm);
+
+    setProgress(20, 'Encoding MP3…', '128 kbps · mono', 1);
+    await tick();
+
+    const mp3enc = new lamejs.Mp3Encoder(1, sampleRate, 128);
+    const chunks = [];
+    const BLOCK  = 1152;
+    const total  = int16.length;
+    let lastYield = 0;
+
+    for (let off = 0; off < total; off += BLOCK) {
+      const enc = mp3enc.encodeBuffer(int16.subarray(off, off + BLOCK));
+      if (enc.length > 0) chunks.push(new Uint8Array(enc));
+      if (off - lastYield > sampleRate * 5) {
+        lastYield = off;
+        const pct = 20 + (off / total) * 70;
+        setProgress(pct, 'Encoding MP3…', `${Math.round(off/total*100)}%`, 1);
+        await tick();
+      }
+    }
+
+    const flushed = mp3enc.flush();
+    if (flushed.length > 0) chunks.push(new Uint8Array(flushed));
+
+    setProgress(93, 'Finalising…', '', 2);
+    await tick();
+
+    const size   = chunks.reduce((a,c) => a+c.length, 0);
+    const output = new Uint8Array(size);
+    let pos = 0;
+    for (const c of chunks) { output.set(c, pos); pos += c.length; }
+
+    const blob = new Blob([output], { type: 'audio/mpeg' });
+
+    clearInterval(_elapsed);
+    timer.textContent = ((Date.now()-t0)/1000).toFixed(1)+'s total';
+    setProgress(100, 'Done!', `${(blob.size/1024).toFixed(0)} KB`, 3);
+    setStatus('MP3 ready', 'ok');
+
+    const bpmLabel = state.mode === 'fixed'
+      ? document.getElementById('bpmFixed').value + 'bpm'
+      : document.getElementById('bpmStart').value + '-' + document.getElementById('bpmEnd').value + 'bpm';
+
+    const dl      = document.getElementById('downloadBtn');
+    dl.href       = URL.createObjectURL(blob);
+    dl.download   = `metronome_${bpmLabel}.mp3`;
+    dl.style.display = 'block';
+
+  } catch(err) {
+    clearInterval(_elapsed);
+    console.error(err);
+    setStatus('Error: ' + err.message, 'error');
+    setProgress(0, 'Failed', '');
+    STEPS.forEach(id => { document.getElementById(id).className = 'step-item'; });
+  }
+  btn.disabled = false;
+};
+
+function tick() { return new Promise(r => setTimeout(r, 16)); }
+
 updateRampPreview();
+onManualChange();
 </script>
 </body>
 </html>
