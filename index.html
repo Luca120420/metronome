@@ -88,7 +88,6 @@
   input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); }
   .slider-val { font-size: 0.75rem; color: var(--text); min-width: 36px; text-align: right; }
 
-  /* ── TEST BUTTON ── */
   .test-btn {
     display: inline-flex;
     align-items: center;
@@ -120,7 +119,6 @@
   .bpm-arrow:hover { border-color: var(--accent); color: var(--accent); }
   #rampSection { display: none; }
 
-  /* ── RAMP BPM BLOCKS ── */
   .bpm-blocks-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -140,8 +138,9 @@
     color: var(--muted);
     margin-bottom: 10px;
   }
+  /* FIXED: wider BPM inputs in ramp blocks so 3-digit numbers aren't cut off */
   .bpm-block .bpm-row { flex-wrap: wrap; gap: 3px; }
-  .bpm-block .num-input { width: 64px; font-size: 1rem; }
+  .bpm-block .num-input { width: 82px; font-size: 1rem; }
   .bpm-block-footer {
     display: flex;
     align-items: center;
@@ -149,7 +148,6 @@
     margin-top: 8px;
   }
 
-  /* ── RAMP PREVIEW ── */
   .ramp-preview {
     margin-top: 16px;
     padding: 14px 16px;
@@ -178,10 +176,8 @@
   .beat-indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.05s; flex-shrink: 0; }
   .beat-indicator.flash { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
 
-  /* ── PROGRESS ── */
   .render-section { display: none; }
 
-  /* Step pills with labels */
   .steps-row {
     display: flex;
     gap: 6px;
@@ -274,7 +270,6 @@
   .checkbox-label input:checked + .box { background: var(--accent); border-color: var(--accent); color: #000; }
   .note { font-size: 0.6rem; color: var(--muted); line-height: 1.6; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); border-left: 2px solid var(--accent2); }
 
-  /* Right panel header flush */
   .right-panel-header {
     margin: -28px -28px 0;
     padding: 16px 28px;
@@ -354,7 +349,6 @@
               <button class="bpm-arrow" onclick="changeBpm('fixed',+10)">+10</button>
             </div>
             <span class="num-input-unit">BPM</span>
-            <!-- FIXED: button contents correctly inside the tag -->
             <button class="test-btn" id="testFixed" onclick="toggleTest('fixed')">
               <span class="dot"></span>TEST
             </button>
@@ -362,11 +356,9 @@
           </div>
         </div>
 
-        <!-- RAMP BPM — side-by-side grid -->
+        <!-- RAMP BPM -->
         <div id="rampSection">
           <div class="bpm-blocks-grid">
-
-            <!-- Start BPM -->
             <div class="bpm-block">
               <div class="bpm-block-label">Start BPM</div>
               <div class="bpm-row">
@@ -378,7 +370,6 @@
               </div>
               <div class="bpm-block-footer">
                 <span class="num-input-unit">BPM</span>
-                <!-- FIXED: was malformed — content was outside the button -->
                 <button class="test-btn" id="testStart" onclick="toggleTest('start')">
                   <span class="dot"></span>TEST
                 </button>
@@ -386,7 +377,6 @@
               </div>
             </div>
 
-            <!-- End BPM -->
             <div class="bpm-block">
               <div class="bpm-block-label">End BPM</div>
               <div class="bpm-row">
@@ -404,10 +394,8 @@
                 <div class="beat-indicator" id="beatEnd"></div>
               </div>
             </div>
-
           </div>
 
-          <!-- RAMP CURVE PREVIEW -->
           <div class="ramp-preview" id="rampPreview">
             <div class="ramp-preview-label">Tempo curve preview</div>
             <svg class="ramp-svg-wrap" id="rampSvg" viewBox="0 0 300 48" preserveAspectRatio="none"></svg>
@@ -520,7 +508,7 @@
       </div>
     </div>
 
-    <a id="downloadBtn" class="download-btn" download="beatsync_output.webm">⬇ DOWNLOAD VIDEO</a>
+    <a id="downloadBtn" class="download-btn" download="beatsync_output.mp4">⬇ DOWNLOAD MP4</a>
 
     <div class="divider"></div>
 
@@ -539,11 +527,11 @@
     <div style="font-size:0.6rem;color:var(--muted);line-height:1.8;">
       <div style="letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">How it works</div>
       1. The original video audio is decoded via Web Audio API<br>
-      2. A metronome click track is synthesized<br>
-      3. Both tracks are mixed per your settings<br>
-      4. The result is encoded into a downloadable WebM file<br>
+      2. A metronome click track is synthesized in PCM<br>
+      3. Both tracks are mixed at your chosen levels → written as WAV<br>
+      4. FFmpeg.wasm muxes: original video frames (bit-perfect copy) + new audio → MP4<br>
       <br>
-      <span style="color:var(--accent2);">Note:</span> Output is WebM format. Convert to MP4 with HandBrake if needed.
+      <span style="color:var(--accent2);">Note:</span> FFmpeg.wasm (~30 MB) loads on first use. Video quality is lossless — only audio is re-encoded to AAC.
     </div>
   </div><!-- /right-panel -->
 </div>
@@ -598,7 +586,6 @@ function updateSlider(el, valId) {
   updateSummary();
 }
 
-// ─── RAMP PREVIEW SVG ────────────────────────────────────────────────────────
 function updateRampPreview() {
   const startBpm = parseInt(document.getElementById('bpmStart').value) || 60;
   const endBpm   = parseInt(document.getElementById('bpmEnd').value)   || 120;
@@ -655,10 +642,10 @@ function updateSummary() {
       document.getElementById('bpmStart').value + ' → ' +
       document.getElementById('bpmEnd').value + ' BPM';
   }
-  document.getElementById('sumOrig').textContent  = document.getElementById('origVol').value + '%';
-  document.getElementById('sumMetro').textContent = document.getElementById('metroVol').value + '%';
-  document.getElementById('sumPitch').textContent = state.pitch[0].toUpperCase() + state.pitch.slice(1);
-  document.getElementById('sumClick').textContent = state.clickType[0].toUpperCase() + state.clickType.slice(1);
+  document.getElementById('sumOrig').textContent    = document.getElementById('origVol').value + '%';
+  document.getElementById('sumMetro').textContent   = document.getElementById('metroVol').value + '%';
+  document.getElementById('sumPitch').textContent   = state.pitch[0].toUpperCase() + state.pitch.slice(1);
+  document.getElementById('sumClick').textContent   = state.clickType[0].toUpperCase() + state.clickType.slice(1);
 }
 
 // ─── PROGRESS ────────────────────────────────────────────────────────────────
@@ -689,7 +676,6 @@ function setProgressIndeterminate(label, sub) {
 
 // ─── CLICK SOUND (live preview) ──────────────────────────────────────────────
 function getPitchFreq() { return { low: 180, mid: 440, high: 1000 }[state.pitch]; }
-function getPitchFreqStatic() { return { low: 180, mid: 440, high: 1000 }[state.pitch]; }
 
 function playClick(ctx, when, gainVal) {
   const freq     = getPitchFreq();
@@ -828,6 +814,8 @@ function loadVideo(file) {
   document.getElementById('processBtn').disabled = false;
   setStatus('Video loaded — configure settings and process', '');
   updateSummary();
+  // Pre-load FFmpeg.wasm in the background so it's ready when the user clicks Process
+  loadFFmpeg().catch(e => console.warn('FFmpeg pre-load failed:', e));
 }
 
 function formatTime(s)  { const m = Math.floor(s/60); return `${m}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
@@ -845,7 +833,6 @@ async function startProcessing() {
   document.getElementById('downloadBtn').style.display   = 'none';
   STEPS.forEach(id => { document.getElementById(id).className = 'step-item'; });
 
-  // Elapsed timer
   const startWall = Date.now();
   const timerEl   = document.getElementById('elapsedTimer');
   if (_elapsedInterval) clearInterval(_elapsedInterval);
@@ -870,20 +857,17 @@ async function startProcessing() {
     try { decodedAudio = await offlineCtx.decodeAudioData(arrayBuffer.slice(0)); }
     catch(e) { console.warn('No audio track or decode failed:', e); }
 
-    // ── FAST PCM SYNTHESIS ──────────────────────────────────────────────────
-    // Yield to the browser so the progress label updates before we start the
-    // (now very fast) synchronous synthesis.
     setProgress(35, 'Synthesizing metronome…', 'Computing click track…', 2);
     await new Promise(r => setTimeout(r, 16));
 
     const metroBuf = synthesizeMetronome(sampleRate, duration);
 
     setProgress(55, 'Mixing audio tracks…', '', 3);
-    await new Promise(r => setTimeout(r, 0)); // let UI breathe
+    await new Promise(r => setTimeout(r, 0));
     const mixedBuffer = mixAudio(decodedAudio, metroBuf, origVolPct, metroVolPct, sampleRate, totalSamples);
 
-    setProgress(70, 'Encoding video…', 'Rendering frames + audio…', 4);
-    const result = await encodeVideoWithAudio(mixedBuffer, sampleRate);
+    setProgress(70, 'Muxing with FFmpeg…', 'Loading FFmpeg.wasm…', 4);
+    const result = await muxWithFFmpeg(arrayBuffer, mixedBuffer, sampleRate);
 
     clearInterval(_elapsedInterval);
     const totalSec = ((Date.now() - startWall) / 1000).toFixed(1);
@@ -894,7 +878,7 @@ async function startProcessing() {
     const dlBtn   = document.getElementById('downloadBtn');
     dlBtn.href     = result;
     dlBtn.style.display = 'block';
-    dlBtn.download = 'beatsync_' + (state.videoFile?.name?.replace(/\.[^.]+$/, '') || 'output') + '.webm';
+    dlBtn.download = 'beatsync_' + (state.videoFile?.name?.replace(/\.[^.]+$/, '') || 'output') + '.mp4';
 
   } catch(err) {
     clearInterval(_elapsedInterval);
@@ -907,15 +891,11 @@ async function startProcessing() {
 }
 
 // ─── FAST PCM METRONOME SYNTHESIS ────────────────────────────────────────────
-// Instead of creating hundreds/thousands of oscillator nodes in an
-// OfflineAudioContext (which must render all audio graph nodes over the full
-// duration), we compute the click samples directly as math — orders of
-// magnitude faster for long videos or high BPM.
 function synthesizeMetronome(sampleRate, duration) {
   const beats      = computeBeatTimes(duration);
   const totalSamples = Math.ceil(sampleRate * duration);
   const data       = new Float32Array(totalSamples);
-  const freq       = getPitchFreqStatic();
+  const freq       = getPitchFreq();
   const clickType  = state.clickType;
 
   for (const beatTime of beats) {
@@ -923,11 +903,10 @@ function synthesizeMetronome(sampleRate, duration) {
     const startIdx = Math.round(beatTime * sampleRate);
 
     if (clickType === 'wood') {
-      // Component 1: sine with exponential frequency sweep (freq*2 → freq*0.5 over 0.08s)
       const f0 = freq * 2, f1 = freq * 0.5;
-      const k  = Math.log(f1 / f0) / 0.08;           // sweep rate
+      const k  = Math.log(f1 / f0) / 0.08;
       const len1 = Math.min(Math.ceil(0.13 * sampleRate), totalSamples - startIdx);
-      const gainDecay1 = -Math.log(0.001) / 0.12;    // ≈ 57.6
+      const gainDecay1 = -Math.log(0.001) / 0.12;
       let phase1 = 0;
       for (let i = 0; i < len1; i++) {
         const t    = i / sampleRate;
@@ -935,7 +914,6 @@ function synthesizeMetronome(sampleRate, duration) {
         phase1    += 2 * Math.PI * fNow / sampleRate;
         data[startIdx + i] += Math.sin(phase1) * Math.exp(-gainDecay1 * t);
       }
-      // Component 2: triangle at freq*0.7, amplitude 0.4, 0.11s
       const len2 = Math.min(Math.ceil(0.11 * sampleRate), totalSamples - startIdx);
       const gainDecay2 = -Math.log(0.001) / 0.10;
       for (let i = 0; i < len2; i++) {
@@ -944,7 +922,6 @@ function synthesizeMetronome(sampleRate, duration) {
         const tri = ph < 0.5 ? 4*ph - 1 : 3 - 4*ph;
         data[startIdx + i] += tri * 0.4 * Math.exp(-gainDecay2 * t);
       }
-
     } else if (clickType === 'sine') {
       const len  = Math.min(Math.ceil(0.16 * sampleRate), totalSamples - startIdx);
       const decay = -Math.log(0.001) / 0.15;
@@ -952,8 +929,7 @@ function synthesizeMetronome(sampleRate, duration) {
         const t = i / sampleRate;
         data[startIdx + i] += Math.sin(2 * Math.PI * freq * t) * Math.exp(-decay * t);
       }
-
-    } else { // noise — biquad bandpass resonator applied to white noise
+    } else {
       const len   = Math.min(Math.ceil(0.09 * sampleRate), totalSamples - startIdx);
       const decay = -Math.log(0.001) / 0.08;
       const omega = 2 * Math.PI * freq / sampleRate;
@@ -961,26 +937,24 @@ function synthesizeMetronome(sampleRate, duration) {
       const cosW  = Math.cos(omega);
       const sinW  = Math.sin(omega);
       const alpha = sinW / (2 * Q);
-      const b0 = alpha, b2 = -alpha;           // b1 = 0
+      const b0 = alpha, b2 = -alpha;
       const a0 = 1 + alpha, a1 = -2 * cosW, a2 = 1 - alpha;
       const n   = 1 / a0;
       let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
       for (let i = 0; i < len; i++) {
         const t  = i / sampleRate;
         const x  = Math.random() * 2 - 1;
-        const y  = (b0*x - b2*x2 - a1*y1 - a2*y2) * n;  // b1*x1 = 0
+        const y  = (b0*x - b2*x2 - a1*y1 - a2*y2) * n;
         x2 = x1; x1 = x; y2 = y1; y1 = y;
         data[startIdx + i] += y * Math.exp(-decay * t);
       }
     }
   }
 
-  // Create AudioBuffer without an OfflineAudioContext
   let audioBuf;
   try {
     audioBuf = new AudioBuffer({ numberOfChannels: 1, length: totalSamples, sampleRate });
   } catch(e) {
-    // Fallback for older browsers: use a tiny OfflineAudioContext as factory only
     const tmp = new OfflineAudioContext(1, 2, sampleRate);
     audioBuf  = tmp.createBuffer(1, totalSamples, sampleRate);
   }
@@ -989,10 +963,6 @@ function synthesizeMetronome(sampleRate, duration) {
 }
 
 // ─── BEAT TIME COMPUTATION ────────────────────────────────────────────────────
-// Fixed mode: trivial arithmetic.
-// Ramp mode: analytic solution — avoids the 1ms-step numerical integration loop
-//   N(t) = (bpmStart·t + (bpmEnd−bpmStart)·t²/(2·dur)) / 60
-//   Beat n at time t where N(t)=n  →  solve quadratic A·t²+B·t−60n=0
 function computeBeatTimes(duration) {
   const beats    = [];
   const bpmFixed = parseInt(document.getElementById('bpmFixed').value);
@@ -1005,16 +975,12 @@ function computeBeatTimes(duration) {
   } else {
     const diff = bpmEnd - bpmStart;
     if (Math.abs(diff) < 0.01) {
-      // Effectively fixed
       const interval = 60 / bpmStart;
       for (let t = 0; t < duration; t += interval) beats.push(t);
     } else {
-      // A·t² + B·t = 60n
-      // A = diff / (2·duration),  B = bpmStart
       const A = diff / (2 * duration);
       const B = bpmStart;
       for (let n = 0; ; n++) {
-        // t = (-B + sqrt(B² + 4·A·60n)) / (2A)
         const disc = B * B + 4 * A * 60 * n;
         if (disc < 0) break;
         const t = (-B + Math.sqrt(disc)) / (2 * A);
@@ -1030,7 +996,6 @@ function computeBeatTimes(duration) {
 function mixAudio(origBuffer, metroBuffer, origGain, metroGain, sampleRate, totalSamples) {
   const mixed  = new Float32Array(totalSamples * 2);
   const metro0 = metroBuffer.getChannelData(0);
-  // Cache channel data references outside the loop (avoids repeated method call overhead)
   const origL  = origBuffer && origBuffer.numberOfChannels > 0 ? origBuffer.getChannelData(0) : null;
   const origR  = origBuffer && origBuffer.numberOfChannels > 1 ? origBuffer.getChannelData(1) : origL;
   const origLen = origL ? origL.length : 0;
@@ -1045,64 +1010,116 @@ function mixAudio(origBuffer, metroBuffer, origGain, metroGain, sampleRate, tota
   return { data: mixed, sampleRate, channels: 2, length: totalSamples };
 }
 
-// ─── ENCODE VIDEO WITH AUDIO ──────────────────────────────────────────────────
-async function encodeVideoWithAudio(mixedAudio, sampleRate) {
-  return new Promise((resolve, reject) => {
-    const video      = document.getElementById('videoPlayer');
-    const captureCtx = new AudioContext({ sampleRate });
-    const audioBuf   = captureCtx.createBuffer(mixedAudio.channels, mixedAudio.length, mixedAudio.sampleRate);
-    const ch0 = audioBuf.getChannelData(0);
-    const ch1 = audioBuf.getChannelData(1);
-    for (let i = 0; i < mixedAudio.length; i++) { ch0[i] = mixedAudio.data[i*2]; ch1[i] = mixedAudio.data[i*2+1]; }
+// ─── FFMPEG WASM LOADER ───────────────────────────────────────────────────────
+let _ffmpegReady = null;
+let _ffmpeg = null;
 
-    const canvas = document.createElement('canvas');
-    canvas.width  = video.videoWidth  || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx2d   = canvas.getContext('2d');
-    const canvasStream      = canvas.captureStream(30);
-    const audioDestination  = captureCtx.createMediaStreamDestination();
-    const src = captureCtx.createBufferSource();
-    src.buffer = audioBuf;
-    src.connect(audioDestination);
-    canvasStream.addTrack(audioDestination.stream.getAudioTracks()[0]);
-
-    const mimeType = getSupportedMimeType();
-    const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 192_000 });
-    const chunks   = [];
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop  = () => { captureCtx.close(); resolve(URL.createObjectURL(new Blob(chunks, { type: mimeType }))); };
-    recorder.onerror = e => reject(e.error);
-
-    const duration = state.videoDuration;
-    let startWallTime = null;
-
-    function drawFrame(wallNow) {
-      if (startWallTime === null) {
-        startWallTime = wallNow;
-        video.muted = true;
-        video.currentTime = 0;
-      }
-      const elapsed  = (wallNow - startWallTime) / 1000;
-      const progress = Math.min(elapsed / duration, 1);
-      const pct      = 70 + Math.floor(progress * 28);
-      setProgress(pct, 'Encoding video…', Math.round(progress * 100) + '% of frames rendered', 4);
-      ctx2d.drawImage(video, 0, 0, canvas.width, canvas.height);
-      if (elapsed < duration) { requestAnimationFrame(drawFrame); }
-      else { recorder.stop(); src.stop(); }
-    }
-
-    recorder.start(100);
-    src.start();
-    video.muted = true;
-    video.currentTime = 0;
-    video.play().then(() => requestAnimationFrame(drawFrame)).catch(reject);
-  });
+async function loadFFmpeg() {
+  if (_ffmpegReady) return _ffmpegReady;
+  _ffmpegReady = (async () => {
+    const { FFmpeg }          = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
+    const { fetchFile, toBlobURL } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
+    _ffmpeg = new FFmpeg();
+    _ffmpeg.on('log', ({ message }) => console.log('[ffmpeg]', message));
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    await _ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`,   'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
+    return { ffmpeg: _ffmpeg, fetchFile };
+  })();
+  return _ffmpegReady;
 }
 
-function getSupportedMimeType() {
-  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
-  for (const t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
-  return '';
+// ─── WAV ENCODER ─────────────────────────────────────────────────────────────
+// Encodes interleaved Float32 stereo PCM into a standard WAV ArrayBuffer.
+function encodeWav(interleavedF32, sampleRate, numChannels) {
+  const numSamples = interleavedF32.length / numChannels;
+  const bytesPerSample = 2; // 16-bit PCM
+  const dataSize = numSamples * numChannels * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view   = new DataView(buffer);
+  const write  = (off, str) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
+  write(0,  'RIFF');
+  view.setUint32(4,  36 + dataSize, true);
+  write(8,  'WAVE');
+  write(12, 'fmt ');
+  view.setUint32(16, 16, true);           // PCM chunk size
+  view.setUint16(20, 1,  true);           // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // byte rate
+  view.setUint16(32, numChannels * bytesPerSample, true);              // block align
+  view.setUint16(34, 16, true);           // bits per sample
+  write(36, 'data');
+  view.setUint32(40, dataSize, true);
+  // Convert Float32 → Int16
+  let offset = 44;
+  for (let i = 0; i < interleavedF32.length; i++) {
+    const s = Math.max(-1, Math.min(1, interleavedF32[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+  return buffer;
+}
+
+// ─── MAIN MUX FUNCTION ────────────────────────────────────────────────────────
+// Strategy:
+//   1. Write original video file bytes → input.<ext>  (video stream untouched)
+//   2. Write mixed PCM as WAV           → audio.wav
+//   3. FFmpeg: -c:v copy -c:a aac → output.mp4
+//      Original video frames are copied bit-for-bit. Only audio is (re-)encoded.
+async function muxWithFFmpeg(videoArrayBuffer, mixedAudio, sampleRate) {
+  setProgress(72, 'Loading FFmpeg.wasm…', 'First run downloads ~30 MB…', 4);
+  const { ffmpeg, fetchFile } = await loadFFmpeg();
+
+  // Determine original file extension for FFmpeg to parse correctly
+  const origExt = (state.videoFile.name.split('.').pop() || 'mp4').toLowerCase();
+  const inName  = `input.${origExt}`;
+
+  setProgress(78, 'Writing files to FFmpeg…', 'Transferring video + audio data…', 4);
+  await new Promise(r => setTimeout(r, 0));
+
+  // Write original video bytes
+  await ffmpeg.writeFile(inName, new Uint8Array(videoArrayBuffer));
+
+  // Build WAV from mixed interleaved PCM
+  const wavBuffer = encodeWav(mixedAudio.data, sampleRate, mixedAudio.channels);
+  await ffmpeg.writeFile('audio.wav', new Uint8Array(wavBuffer));
+
+  setProgress(85, 'Muxing video + audio…', 'Encoding audio track, copying video…', 4);
+  await new Promise(r => setTimeout(r, 0));
+
+  // Hook FFmpeg progress events
+  ffmpeg.on('progress', ({ progress }) => {
+    if (progress >= 0 && progress <= 1) {
+      const pct = 85 + Math.floor(progress * 12);
+      setProgress(pct, 'Muxing video + audio…', `FFmpeg: ${Math.round(progress * 100)}%`, 4);
+    }
+  });
+
+  await ffmpeg.exec([
+    '-i', inName,          // original video (all streams)
+    '-i', 'audio.wav',     // our mixed audio
+    '-map', '0:v:0',       // take video stream from original
+    '-map', '1:a:0',       // take audio from our WAV (replaces original audio)
+    '-c:v', 'copy',        // copy video frames — zero quality loss, very fast
+    '-c:a', 'aac',         // encode audio to AAC (required for MP4)
+    '-b:a', '192k',
+    '-movflags', '+faststart',
+    '-y',
+    'output.mp4'
+  ]);
+
+  setProgress(98, 'Finalising MP4…', 'Reading output…', 4);
+  const data = await ffmpeg.readFile('output.mp4');
+
+  // Clean up FFmpeg virtual FS
+  try { await ffmpeg.deleteFile(inName); } catch(_) {}
+  try { await ffmpeg.deleteFile('audio.wav'); } catch(_) {}
+  try { await ffmpeg.deleteFile('output.mp4'); } catch(_) {}
+
+  return URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
 }
 
 updateSummary();
