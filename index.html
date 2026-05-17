@@ -1017,15 +1017,33 @@ let _ffmpeg = null;
 async function loadFFmpeg() {
   if (_ffmpegReady) return _ffmpegReady;
   _ffmpegReady = (async () => {
-    const { FFmpeg }          = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
-    const { fetchFile, toBlobURL } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
+    // jsdelivr sets correct CORS headers; toBlobURL rewrites each script as a
+    // same-origin blob URL — this is the standard fix for the Worker origin
+    // error on GitHub Pages and any non-localhost host.
+    const CDN = 'https://cdn.jsdelivr.net/npm';
+    const { FFmpeg }    = await import(`${CDN}/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js`);
+    const { toBlobURL } = await import(`${CDN}/@ffmpeg/util@0.12.1/dist/esm/index.js`);
+
     _ffmpeg = new FFmpeg();
     _ffmpeg.on('log', ({ message }) => console.log('[ffmpeg]', message));
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+
+    const coreBase = `${CDN}/@ffmpeg/core@0.12.6/dist/esm`;
     await _ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`,   'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      coreURL:   await toBlobURL(`${coreBase}/ffmpeg-core.js`,   'text/javascript'),
+      wasmURL:   await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm'),
+      // Also blob-ify the worker script — eliminates the "cannot access worker.js
+      // from origin" error that occurs on GitHub Pages with unpkg URLs.
+      workerURL: await toBlobURL(`${CDN}/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js`, 'text/javascript'),
     });
+
+    // Minimal fetchFile — handles Blob, ArrayBuffer, Uint8Array
+    const fetchFile = async (src) => {
+      if (src instanceof Uint8Array) return src;
+      if (src instanceof ArrayBuffer || ArrayBuffer.isView(src)) return new Uint8Array(src instanceof ArrayBuffer ? src : src.buffer);
+      if (src instanceof Blob) return new Uint8Array(await src.arrayBuffer());
+      return new Uint8Array(await (await fetch(src)).arrayBuffer());
+    };
+
     return { ffmpeg: _ffmpeg, fetchFile };
   })();
   return _ffmpegReady;
