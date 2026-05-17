@@ -937,9 +937,18 @@ async function loadFFmpegInstance() {
     }
   });
 
+  // All four URLs must be blob:-proxied so the browser treats them as
+  // same-origin and allows them to be used from a Worker context.
+  // - ffmpegURL  : the ffmpeg library's own internal worker script
+  // - coreURL    : ffmpeg-core glue JS
+  // - wasmURL    : ffmpeg-core WASM binary
+  // - workerURL  : ffmpeg-core's inner worker (loaded by the core glue)
+  const ffmpegBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
+
   await ffmpeg.load({
-    coreURL:    await window._toBlobURL(`${baseURL}/ffmpeg-core.js`,   'text/javascript'),
-    wasmURL:    await window._toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    ffmpegURL:  await window._toBlobURL(`${ffmpegBase}/worker.js`,          'text/javascript'),
+    coreURL:    await window._toBlobURL(`${baseURL}/ffmpeg-core.js`,        'text/javascript'),
+    wasmURL:    await window._toBlobURL(`${baseURL}/ffmpeg-core.wasm`,      'application/wasm'),
     workerURL:  await window._toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
   });
 
