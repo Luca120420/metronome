@@ -138,7 +138,6 @@
     color: var(--muted);
     margin-bottom: 10px;
   }
-  /* FIXED: wider BPM inputs in ramp blocks so 3-digit numbers aren't cut off */
   .bpm-block .bpm-row { flex-wrap: wrap; gap: 3px; }
   .bpm-block .num-input { width: 82px; font-size: 1rem; }
   .bpm-block-footer {
@@ -536,6 +535,14 @@
   </div><!-- /right-panel -->
 </div>
 
+<!--
+  IMPORTANT: We use @ffmpeg/ffmpeg@0.11.x (UMD build) + @ffmpeg/core@0.11.x.
+  This version runs entirely on the MAIN THREAD — no SharedArrayBuffer, no Worker.
+  This eliminates the "cannot access worker.js from origin" error on GitHub Pages
+  and any host that doesn't set COOP/COEP headers.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+
 <script>
 const state = { mode: 'fixed', pitch: 'low', clickType: 'wood', videoFile: null, videoDuration: 0 };
 let audioCtx = null;
@@ -814,7 +821,7 @@ function loadVideo(file) {
   document.getElementById('processBtn').disabled = false;
   setStatus('Video loaded — configure settings and process', '');
   updateSummary();
-  // Pre-load FFmpeg.wasm in the background so it's ready when the user clicks Process
+  // Pre-load FFmpeg in the background so it's ready when the user clicks Process
   loadFFmpeg().catch(e => console.warn('FFmpeg pre-load failed:', e));
 }
 
@@ -1010,47 +1017,7 @@ function mixAudio(origBuffer, metroBuffer, origGain, metroGain, sampleRate, tota
   return { data: mixed, sampleRate, channels: 2, length: totalSamples };
 }
 
-// ─── FFMPEG WASM LOADER ───────────────────────────────────────────────────────
-let _ffmpegReady = null;
-let _ffmpeg = null;
-
-async function loadFFmpeg() {
-  if (_ffmpegReady) return _ffmpegReady;
-  _ffmpegReady = (async () => {
-    // jsdelivr sets correct CORS headers; toBlobURL rewrites each script as a
-    // same-origin blob URL — this is the standard fix for the Worker origin
-    // error on GitHub Pages and any non-localhost host.
-    const CDN = 'https://cdn.jsdelivr.net/npm';
-    const { FFmpeg }    = await import(`${CDN}/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js`);
-    const { toBlobURL } = await import(`${CDN}/@ffmpeg/util@0.12.1/dist/esm/index.js`);
-
-    _ffmpeg = new FFmpeg();
-    _ffmpeg.on('log', ({ message }) => console.log('[ffmpeg]', message));
-
-    const coreBase = `${CDN}/@ffmpeg/core@0.12.6/dist/esm`;
-    await _ffmpeg.load({
-      coreURL:   await toBlobURL(`${coreBase}/ffmpeg-core.js`,   'text/javascript'),
-      wasmURL:   await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm'),
-      // Also blob-ify the worker script — eliminates the "cannot access worker.js
-      // from origin" error that occurs on GitHub Pages with unpkg URLs.
-      workerURL: await toBlobURL(`${CDN}/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js`, 'text/javascript'),
-    });
-
-    // Minimal fetchFile — handles Blob, ArrayBuffer, Uint8Array
-    const fetchFile = async (src) => {
-      if (src instanceof Uint8Array) return src;
-      if (src instanceof ArrayBuffer || ArrayBuffer.isView(src)) return new Uint8Array(src instanceof ArrayBuffer ? src : src.buffer);
-      if (src instanceof Blob) return new Uint8Array(await src.arrayBuffer());
-      return new Uint8Array(await (await fetch(src)).arrayBuffer());
-    };
-
-    return { ffmpeg: _ffmpeg, fetchFile };
-  })();
-  return _ffmpegReady;
-}
-
 // ─── WAV ENCODER ─────────────────────────────────────────────────────────────
-// Encodes interleaved Float32 stereo PCM into a standard WAV ArrayBuffer.
 function encodeWav(interleavedF32, sampleRate, numChannels) {
   const numSamples = interleavedF32.length / numChannels;
   const bytesPerSample = 2; // 16-bit PCM
@@ -1062,16 +1029,15 @@ function encodeWav(interleavedF32, sampleRate, numChannels) {
   view.setUint32(4,  36 + dataSize, true);
   write(8,  'WAVE');
   write(12, 'fmt ');
-  view.setUint32(16, 16, true);           // PCM chunk size
-  view.setUint16(20, 1,  true);           // PCM format
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1,  true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // byte rate
-  view.setUint16(32, numChannels * bytesPerSample, true);              // block align
-  view.setUint16(34, 16, true);           // bits per sample
+  view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
+  view.setUint16(32, numChannels * bytesPerSample, true);
+  view.setUint16(34, 16, true);
   write(36, 'data');
   view.setUint32(40, dataSize, true);
-  // Convert Float32 → Int16
   let offset = 44;
   for (let i = 0; i < interleavedF32.length; i++) {
     const s = Math.max(-1, Math.min(1, interleavedF32[i]));
@@ -1081,61 +1047,85 @@ function encodeWav(interleavedF32, sampleRate, numChannels) {
   return buffer;
 }
 
+// ─── FFMPEG 0.11.x LOADER (main-thread, no Worker, no CORS issues) ────────────
+//
+// @ffmpeg/ffmpeg@0.11.x exposes a global { createFFmpeg, fetchFile } via the UMD
+// bundle loaded above. It runs on the main thread — no SharedArrayBuffer and no
+// Worker are needed, which avoids the GitHub Pages cross-origin Worker error.
+//
+let _ffmpegInstance = null;
+let _ffmpegLoading  = null;
+
+async function loadFFmpeg() {
+  if (_ffmpegInstance) return _ffmpegInstance;
+  if (_ffmpegLoading)  return _ffmpegLoading;
+
+  _ffmpegLoading = (async () => {
+    const { createFFmpeg } = window.FFmpeg; // from the UMD script tag above
+
+    const ffmpeg = createFFmpeg({
+      // Use jsDelivr for the core wasm — same CDN, reliable CORS headers
+      corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+      log: true,
+      progress: ({ ratio }) => {
+        if (ratio >= 0 && ratio <= 1) {
+          const pct = 85 + Math.floor(ratio * 12);
+          setProgress(pct, 'Muxing video + audio…', `FFmpeg: ${Math.round(ratio * 100)}%`, 4);
+        }
+      },
+    });
+
+    await ffmpeg.load();
+    _ffmpegInstance = ffmpeg;
+    return ffmpeg;
+  })();
+
+  return _ffmpegLoading;
+}
+
 // ─── MAIN MUX FUNCTION ────────────────────────────────────────────────────────
-// Strategy:
-//   1. Write original video file bytes → input.<ext>  (video stream untouched)
-//   2. Write mixed PCM as WAV           → audio.wav
-//   3. FFmpeg: -c:v copy -c:a aac → output.mp4
-//      Original video frames are copied bit-for-bit. Only audio is (re-)encoded.
 async function muxWithFFmpeg(videoArrayBuffer, mixedAudio, sampleRate) {
   setProgress(72, 'Loading FFmpeg.wasm…', 'First run downloads ~30 MB…', 4);
-  const { ffmpeg, fetchFile } = await loadFFmpeg();
+  const ffmpeg = await loadFFmpeg();
 
-  // Determine original file extension for FFmpeg to parse correctly
+  const { fetchFile } = window.FFmpeg;
+
   const origExt = (state.videoFile.name.split('.').pop() || 'mp4').toLowerCase();
   const inName  = `input.${origExt}`;
 
   setProgress(78, 'Writing files to FFmpeg…', 'Transferring video + audio data…', 4);
   await new Promise(r => setTimeout(r, 0));
 
-  // Write original video bytes
-  await ffmpeg.writeFile(inName, new Uint8Array(videoArrayBuffer));
+  // Write original video bytes into FFmpeg's virtual FS
+  ffmpeg.FS('writeFile', inName, await fetchFile(new Blob([videoArrayBuffer])));
 
-  // Build WAV from mixed interleaved PCM
+  // Build WAV and write it too
   const wavBuffer = encodeWav(mixedAudio.data, sampleRate, mixedAudio.channels);
-  await ffmpeg.writeFile('audio.wav', new Uint8Array(wavBuffer));
+  ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(new Blob([wavBuffer])));
 
   setProgress(85, 'Muxing video + audio…', 'Encoding audio track, copying video…', 4);
   await new Promise(r => setTimeout(r, 0));
 
-  // Hook FFmpeg progress events
-  ffmpeg.on('progress', ({ progress }) => {
-    if (progress >= 0 && progress <= 1) {
-      const pct = 85 + Math.floor(progress * 12);
-      setProgress(pct, 'Muxing video + audio…', `FFmpeg: ${Math.round(progress * 100)}%`, 4);
-    }
-  });
-
-  await ffmpeg.exec([
-    '-i', inName,          // original video (all streams)
-    '-i', 'audio.wav',     // our mixed audio
-    '-map', '0:v:0',       // take video stream from original
-    '-map', '1:a:0',       // take audio from our WAV (replaces original audio)
-    '-c:v', 'copy',        // copy video frames — zero quality loss, very fast
-    '-c:a', 'aac',         // encode audio to AAC (required for MP4)
+  await ffmpeg.run(
+    '-i', inName,
+    '-i', 'audio.wav',
+    '-map', '0:v:0',
+    '-map', '1:a:0',
+    '-c:v', 'copy',
+    '-c:a', 'aac',
     '-b:a', '192k',
     '-movflags', '+faststart',
     '-y',
     'output.mp4'
-  ]);
+  );
 
   setProgress(98, 'Finalising MP4…', 'Reading output…', 4);
-  const data = await ffmpeg.readFile('output.mp4');
+  const data = ffmpeg.FS('readFile', 'output.mp4');
 
-  // Clean up FFmpeg virtual FS
-  try { await ffmpeg.deleteFile(inName); } catch(_) {}
-  try { await ffmpeg.deleteFile('audio.wav'); } catch(_) {}
-  try { await ffmpeg.deleteFile('output.mp4'); } catch(_) {}
+  // Clean up virtual FS
+  try { ffmpeg.FS('unlink', inName); }      catch(_) {}
+  try { ffmpeg.FS('unlink', 'audio.wav'); } catch(_) {}
+  try { ffmpeg.FS('unlink', 'output.mp4'); } catch(_) {}
 
   return URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
 }
